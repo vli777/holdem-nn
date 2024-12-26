@@ -22,3 +22,9 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Training data
+data/
+
+# Model weights
+models/
