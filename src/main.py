@@ -1,93 +1,41 @@
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, random_split
-from poker_dataset import PokerDataset
-import logging
+import eval7
+from PokerDataset import PokerDataset
+from PokerModel import PokerModel
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
-
-# Load dataset and split into training/validation
-dataset = PokerDataset("texas_holdem_data.npy")
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
-
-# Data loaders
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-
-# Inspect a batch
-for batch in train_loader:
-    states, actions = batch
-    logging.info(f"States shape: {states.shape}, Actions shape: {actions.shape}")
-    break
-
-
-# Model Definition
-class PokerModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(PokerModel, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x):
-        x = self.relu(self.fc1(x))
-        return self.fc2(x)
-
-
-# Hyperparameters
-input_dim = states.shape[1]  # Automatically match dataset output
+# Load model
+input_dim = 106  # Update based on your dataset format
 hidden_dim = 128
-output_dim = 3  # "fold", "call", "raise"
-learning_rate = 1e-3
-num_epochs = 10
-
-# Model, Loss, Optimizer
+output_dim = 3
 model = PokerModel(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim)
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+model.load_state_dict(torch.load("models/poker_model.pth", weights_only=True))
+model.eval()
 
-# Training Loop
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
-    for states, actions in train_loader:
-        optimizer.zero_grad()
-        outputs = model(states)
-        loss = criterion(outputs, actions)
-        loss.backward()
+# Sample game state
+sample_action = {
+    "hole_cards": [eval7.Card("As"), eval7.Card("Ah")],
+    "community_cards": [eval7.Card("5d"), eval7.Card("9s"), eval7.Card("8c")],
+    "hand_strength": 0.8,
+    "pot_odds": 0.5
+}
 
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5)
+print("Raw hand state:")
+print(f"Hole Cards: {[str(card) for card in sample_action['hole_cards']]}")
+print(f"Community Cards: {[str(card) for card in sample_action['community_cards']]}")
+print(f"Hand Strength: {sample_action['hand_strength']}")
+print(f"Pot Odds: {sample_action['pot_odds']}")
 
-        optimizer.step()
-        running_loss += loss.item()
+# Encode the state
+encoded_state = PokerDataset.encode_state(sample_action)
+input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
 
-    # Validation Loop
-    model.eval()
-    val_loss = 0.0
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for states, actions in val_loader:
-            outputs = model(states)
-            loss = criterion(outputs, actions)
-            val_loss += loss.item()
+# Predict action
+output = model(input_tensor)
+predicted_action = torch.argmax(output, dim=1).item()
 
-            # Calculate accuracy
-            _, predicted = torch.max(outputs, 1)
-            total += actions.size(0)
-            correct += (predicted == actions).sum().item()
+# Map prediction to action name
+action_map = {0: "fold", 1: "call", 2: "raise"}
+predicted_action_name = action_map[predicted_action]
 
-    # Logging
-    train_loss = running_loss / len(train_loader)
-    val_loss = val_loss / len(val_loader)
-    accuracy = correct / total * 100
-    logging.info(
-        f"Epoch {epoch + 1}/{num_epochs}, "
-        f"Train Loss: {train_loss:.4f}, "
-        f"Val Loss: {val_loss:.4f}, "
-        f"Accuracy: {accuracy:.2f}%"
-    )
+print(f"Predicted action: {predicted_action_name}")
+

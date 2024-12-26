@@ -4,12 +4,28 @@ import numpy as np
 
 
 def evaluate_hand(hole_cards, community_cards):
-    """Evaluate the strength of a poker hand."""
-    hand = eval7.Hand(hole_cards + community_cards)
-    return hand.evaluate() / eval7.Hand.MAX_RANK
+    """
+    Evaluate the strength and type of a poker hand.
+    Args:
+        hole_cards (list[eval7.Card]): Player's hole cards.
+        community_cards (list[eval7.Card]): Community cards on the table.
+    Returns:
+        tuple: (hand_strength (int), hand_type (str))
+    """
+    # Combine hole cards and community cards
+    full_hand = hole_cards + community_cards
+
+    # Evaluate hand strength
+    hand_strength = eval7.evaluate(full_hand)
+
+    # Get hand type (e.g., 'Pair', 'Straight', etc.)
+    hand_type = eval7.handtype(hand_strength)
+
+    return hand_strength, hand_type
 
 
-def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="balanced"):
+def decide_action(hand_strength, pot_odds,
+                  bluffing_probability, player_type="balanced"):
     """
     Decide an action based on hand strength, pot odds, and bluffing.
     Args:
@@ -38,48 +54,81 @@ def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="ba
         return "fold"
 
 
-def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=500):
-    """Estimate win probability via Monte Carlo simulation."""
-    deck = eval7.Deck()
-    used_cards = hole_cards + community_cards
-    for card in used_cards:
-        deck.cards.remove(card)
-
+def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=1000):
+    """
+    Estimate win probability using Monte Carlo simulation.
+    Args:
+        hole_cards (list[eval7.Card]): Player's hole cards.
+        community_cards (list[eval7.Card]): Community cards on the table.
+        num_simulations (int): Number of simulations to run.
+    Returns:
+        float: Estimated win probability (0 to 1).
+    """
     wins = 0
     ties = 0
 
     for _ in range(num_simulations):
+        # Create a fresh deck for every simulation
+        deck = eval7.Deck()
+
+        # Remove known cards from the deck
+        used_cards = hole_cards + community_cards
+        for card in used_cards:
+            deck.cards.remove(card)
+
+        # Shuffle the deck
         deck.shuffle()
+
+        # Deal opponent's hole cards and remaining community cards
         opponent_hole_cards = deck.deal(2)
         remaining_community_cards = community_cards + deck.deal(5 - len(community_cards))
 
-        player_hand = eval7.Hand(hole_cards + remaining_community_cards)
-        opponent_hand = eval7.Hand(opponent_hole_cards + remaining_community_cards)
+        # Evaluate hands
+        player_hand_strength = eval7.evaluate(hole_cards + remaining_community_cards)
+        opponent_hand_strength = eval7.evaluate(opponent_hole_cards + remaining_community_cards)
 
-        player_score = player_hand.evaluate()
-        opponent_score = opponent_hand.evaluate()
-
-        if player_score > opponent_score:
+        if player_hand_strength > opponent_hand_strength:
             wins += 1
-        elif player_score == opponent_score:
+        elif player_hand_strength == opponent_hand_strength:
             ties += 1
 
+    # Compute win probability
     total = num_simulations
-    return (wins + 0.5 * ties) / total  # Adjusted for ties
+    return (wins + 0.5 * ties) / total  # Adjust for ties
 
 
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """Encodes game state as a feature vector."""
     hole_cards_vector = cards_to_vector(hole_cards)
     community_cards_vector = cards_to_vector(community_cards)
-    return np.concatenate([hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]])
+    return np.concatenate(
+        [hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]])
 
 
 def cards_to_vector(cards):
-    """Encodes cards as a one-hot vector."""
-    vector = np.zeros(52)
+    """
+    Encodes a list of eval7.Card objects as a one-hot vector.
+    Args:
+        cards (list[eval7.Card]): List of eval7.Card objects.
+    Returns:
+        np.ndarray: A one-hot vector representing the cards.
+    """
+    ranks = "23456789TJQKA"  # Rank order
+    suits = ["s", "h", "d", "c"]  # Suit order mapped from integers
+    vector = np.zeros(52)  # 52 cards in a deck
+
     for card in cards:
-        vector[card.to_int()] = 1
+        # Convert rank to string if it's an integer
+        rank = ranks[card.rank - 2] if isinstance(card.rank, int) else card.rank
+
+        # Convert suit to string if it's an integer
+        suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
+
+        rank_index = ranks.index(rank)
+        suit_index = suits.index(suit)
+        card_index = rank_index * 4 + suit_index  # Unique index for each card
+        vector[card_index] = 1  # Set the corresponding position in the vector
+
     return vector
 
 
@@ -90,43 +139,64 @@ def encode_action(action):
 
 
 def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.2):
-    """Simulate Texas Hold'em with multiple players."""
-    deck = eval7.Deck()
+    """
+    Simulate Texas Hold'em games and collect state-action pairs.
+    Args:
+        num_players (int): Number of players in the game.
+        num_games (int): Number of games to simulate.
+        bluffing_probability (float): Bluffing probability for players.
+    Returns:
+        list: Encoded state-action pairs for training.
+    """
     game_data = []
 
     for _ in range(num_games):
+        # Create a fresh deck for each game
+        deck = eval7.Deck()
         deck.shuffle()
 
-        # Deal hole cards
+        # Deal hole cards for all players
         player_hole_cards = [deck.deal(2) for _ in range(num_players)]
 
-        # Initialize state
+        # Initialize community cards and game state
         community_cards = []
-        pot_size = 2 * num_players  # Starting pot size
-        player_stacks = [100 for _ in range(num_players)]  # Equal stacks
-        actions = [{} for _ in range(num_players)]  # Placeholder for each player's actions
+        actions = []
 
-        # Simulate betting rounds
-        for round_idx, num_cards in enumerate([0, 3, 1, 1]):  # Pre-flop, flop, turn, river
-            community_cards += deck.deal(num_cards)
+        # Pre-flop round
+        for player in range(num_players):
+            hand_strength = monte_carlo_hand_strength(
+                player_hole_cards[player], community_cards
+            )
+            pot_odds = 0.2  # Example pot odds; update as needed
+            action = decide_action(hand_strength, pot_odds, bluffing_probability)
+
+            encoded_state = encode_state(
+                player_hole_cards[player], community_cards, hand_strength, pot_odds
+            )
+            encoded_action = encode_action(action)
+            actions.append({"state": encoded_state, "action": encoded_action})
+
+        # Simulate flop, turn, river rounds
+        for round_cards in [3, 1, 1]:  # Flop (3 cards), turn (1 card), river (1 card)
+            community_cards += deck.deal(round_cards)
 
             for player in range(num_players):
-                if actions[player].get("action") == 0:  # Skip folded players
+                if actions[player]["action"] == 0:  # Skip folded players
                     continue
 
-                hand_strength = monte_carlo_hand_strength(player_hole_cards[player], community_cards)
-                pot_odds = pot_size / (player_stacks[player] + pot_size)
+                hand_strength = monte_carlo_hand_strength(
+                    player_hole_cards[player], community_cards
+                )
+                pot_odds = 0.2  # Example pot odds; update as needed
                 action = decide_action(hand_strength, pot_odds, bluffing_probability)
 
-                # Update actions and encode state
-                encoded_state = encode_state(player_hole_cards[player], community_cards, hand_strength, pot_odds)
+                encoded_state = encode_state(
+                    player_hole_cards[player], community_cards, hand_strength, pot_odds
+                )
                 encoded_action = encode_action(action)
+                actions[player] = {"state": encoded_state, "action": encoded_action}
 
-                actions[player] = {
-                    "state": encoded_state,
-                    "action": encoded_action
-                }
-
+        # Append game actions
         game_data.append(actions)
 
     return game_data
@@ -134,4 +204,4 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.
 
 # Save the simulation data
 game_data = simulate_texas_holdem(num_games=1000, bluffing_probability=0.2)
-np.save("texas_holdem_data.npy", game_data)
+np.save("../data/texas_holdem_data.npy", game_data)
