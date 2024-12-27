@@ -1,6 +1,7 @@
 import eval7
 import random
 import numpy as np
+import os
 
 
 def evaluate_hand(hole_cards, community_cards):
@@ -210,6 +211,32 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.
     return game_data
 
 
-# Save the simulation data
-game_data = simulate_texas_holdem(num_games=1000, bluffing_probability=0.2)
-np.save("../data/texas_holdem_data.npy", game_data)
+def append_simulation_data(file_path, new_data):
+    """
+    Append new training data to the existing dataset.
+    Args:
+        file_path (str): Path to the dataset file.
+        new_data (list): New game data to append.
+    """
+    if os.path.exists(file_path):
+        # Load existing data
+        existing_data = np.load(file_path, allow_pickle=True).tolist()
+        # Append new data
+        updated_data = existing_data + new_data
+    else:
+        # No existing data; use new data as the dataset
+        updated_data = new_data
+
+    # Save the updated dataset
+    np.save(file_path, updated_data)
+    print(f"Data saved to {file_path}. Total samples: {len(updated_data)}")
+
+
+# Generate new simulation data
+game_data = simulate_texas_holdem(num_games=9000, bluffing_probability=0.2)
+
+# Define the file path
+file_path = "../data/texas_holdem_data.npy"
+
+# Append new data to the file
+append_simulation_data(file_path, game_data)
