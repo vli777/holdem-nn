@@ -3,8 +3,6 @@ from torch.utils.data import Dataset
 import numpy as np
 import logging
 
-logging.basicConfig(level=logging.WARNING)
-
 
 class PokerDataset(Dataset):
     def __init__(self, data_path):
@@ -23,14 +21,14 @@ class PokerDataset(Dataset):
             for action in game:
                 try:
                     state = self.encode_state(action)
-                    action_label = self.encode_action(action["action"])                    
-                    if action_label != -1:                        
+                    action_label = self.encode_action(action["action"])
+                    if action_label != -1:
                         self.data.append((state, action_label))
                 except KeyError as e:
-                    logging.warning(f"Missing key {e} in action data, skipping...")
+                    logging.warning(
+                        f"Missing key {e} in action data, skipping...")
                 except Exception as e:
                     logging.error(f"Unexpected error: {e}, skipping...")
-
 
     @staticmethod
     def encode_state(action):
@@ -59,15 +57,18 @@ class PokerDataset(Dataset):
 
         for card in cards:
             # Convert rank to string if it's an integer
-            rank = ranks[card.rank - 2] if isinstance(card.rank, int) else card.rank
+            rank = ranks[card.rank -
+                         2] if isinstance(card.rank, int) else card.rank
 
             # Convert suit to string if it's an integer
-            suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
+            suit = suits[card.suit] if isinstance(
+                card.suit, int) else card.suit
 
             rank_index = ranks.index(rank)
             suit_index = suits.index(suit)
             card_index = rank_index * 4 + suit_index  # Unique index for each card
-            vector[card_index] = 1  # Set the corresponding position in the vector
+            # Set the corresponding position in the vector
+            vector[card_index] = 1
 
         return vector
 
@@ -75,7 +76,7 @@ class PokerDataset(Dataset):
     def encode_action(action):
         """Encodes action as a numerical label."""
         action_map = {"fold": 0, "call": 1, "raise": 2}
-        
+
         # If action is already an integer and valid, return it directly
         if isinstance(action, int) and action in {0, 1, 2}:
             return action
@@ -88,6 +89,7 @@ class PokerDataset(Dataset):
 
     def __getitem__(self, idx):
         if idx < 0 or idx >= len(self.data):
-            raise IndexError(f"Index {idx} out of range for dataset of size {len(self.data)}")
+            raise IndexError(
+                f"Index {idx} out of range for dataset of size {len(self.data)}")
         state, action_label = self.data[idx]
         return torch.tensor(state, dtype=torch.float32), torch.tensor(action_label, dtype=torch.long)

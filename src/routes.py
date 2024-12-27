@@ -12,11 +12,13 @@ predictor = PokerPredictor(
     output_dim=3
 )
 
+
 class HandState(BaseModel):
     hole_cards: List[str]
     community_cards: List[str]
     hand_strength: float
     pot_odds: float
+
 
 @app.post("/predict")
 def predict_action(hand_state: HandState):

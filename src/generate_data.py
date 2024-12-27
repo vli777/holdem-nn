@@ -81,11 +81,14 @@ def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=1000)
 
         # Deal opponent's hole cards and remaining community cards
         opponent_hole_cards = deck.deal(2)
-        remaining_community_cards = community_cards + deck.deal(5 - len(community_cards))
+        remaining_community_cards = community_cards + \
+            deck.deal(5 - len(community_cards))
 
         # Evaluate hands
-        player_hand_strength = eval7.evaluate(hole_cards + remaining_community_cards)
-        opponent_hand_strength = eval7.evaluate(opponent_hole_cards + remaining_community_cards)
+        player_hand_strength = eval7.evaluate(
+            hole_cards + remaining_community_cards)
+        opponent_hand_strength = eval7.evaluate(
+            opponent_hole_cards + remaining_community_cards)
 
         if player_hand_strength > opponent_hand_strength:
             wins += 1
@@ -119,7 +122,8 @@ def cards_to_vector(cards):
 
     for card in cards:
         # Convert rank to string if it's an integer
-        rank = ranks[card.rank - 2] if isinstance(card.rank, int) else card.rank
+        rank = ranks[card.rank -
+                     2] if isinstance(card.rank, int) else card.rank
 
         # Convert suit to string if it's an integer
         suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
@@ -168,7 +172,8 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.
                 player_hole_cards[player], community_cards
             )
             pot_odds = 0.2  # Example pot odds; update as needed
-            action = decide_action(hand_strength, pot_odds, bluffing_probability)
+            action = decide_action(
+                hand_strength, pot_odds, bluffing_probability)
 
             encoded_state = encode_state(
                 player_hole_cards[player], community_cards, hand_strength, pot_odds
@@ -177,7 +182,8 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.
             actions.append({"state": encoded_state, "action": encoded_action})
 
         # Simulate flop, turn, river rounds
-        for round_cards in [3, 1, 1]:  # Flop (3 cards), turn (1 card), river (1 card)
+        # Flop (3 cards), turn (1 card), river (1 card)
+        for round_cards in [3, 1, 1]:
             community_cards += deck.deal(round_cards)
 
             for player in range(num_players):
@@ -188,13 +194,15 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_probability=0.
                     player_hole_cards[player], community_cards
                 )
                 pot_odds = 0.2  # Example pot odds; update as needed
-                action = decide_action(hand_strength, pot_odds, bluffing_probability)
+                action = decide_action(
+                    hand_strength, pot_odds, bluffing_probability)
 
                 encoded_state = encode_state(
                     player_hole_cards[player], community_cards, hand_strength, pot_odds
                 )
                 encoded_action = encode_action(action)
-                actions[player] = {"state": encoded_state, "action": encoded_action}
+                actions[player] = {"state": encoded_state,
+                                   "action": encoded_action}
 
         # Append game actions
         game_data.append(actions)

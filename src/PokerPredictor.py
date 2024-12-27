@@ -2,10 +2,12 @@ import torch
 from PokerDataset import PokerDataset
 from PokerModel import PokerModel
 
+
 class PokerPredictor:
     def __init__(self, model_path, input_dim, hidden_dim, output_dim):
         """Initialize the predictor by loading the model."""
-        self.model = PokerModel(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim)
+        self.model = PokerModel(input_dim=input_dim,
+                                hidden_dim=hidden_dim, output_dim=output_dim)
         self.model.load_state_dict(torch.load(model_path))
         self.model.eval()  # Set the model to evaluation mode
 
@@ -25,7 +27,8 @@ class PokerPredictor:
         """
         # Encode the state
         encoded_state = PokerDataset.encode_state(sample_action)
-        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
+            0)  # Add batch dimension
 
         # Predict
         output = self.model(input_tensor)
@@ -41,7 +44,8 @@ class PokerPredictor:
             sample_action (dict): The hand state.
         """
         hole_cards = [str(card) for card in sample_action["hole_cards"]]
-        community_cards = [str(card) for card in sample_action["community_cards"]]
+        community_cards = [str(card)
+                           for card in sample_action["community_cards"]]
         hand_strength = sample_action["hand_strength"]
         pot_odds = sample_action["pot_odds"]
 

@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+
 class PokerModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(PokerModel, self).__init__()

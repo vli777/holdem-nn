@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import KFold
 import os
 
+
 def k_fold_cross_validation(dataset, device, model_class, model_params, criterion, optimizer_class, optimizer_params, k=5, epochs=10, batch_size=32, model_save_dir="models"):
     """
     Perform K-Fold Cross-Validation and save model weights for each fold.
@@ -33,8 +34,10 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
         train_subset = Subset(dataset, train_indices)
         val_subset = Subset(dataset, val_indices)
 
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(
+            train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(
+            val_subset, batch_size=batch_size, shuffle=False)
 
         # Initialize model, optimizer, and criterion
         model = model_class(**model_params).to(device)
@@ -47,6 +50,10 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
 
             for states, actions in train_loader:
                 states, actions = states.to(device), actions.to(device)
+                # Ensure states have sequence dimension
+                if states.ndim == 2:
+                    # Add sequence length dimension
+                    states = states.unsqueeze(1)
                 optimizer.zero_grad()
                 outputs = model(states)
                 loss = criterion(outputs, actions)
@@ -76,7 +83,8 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
             print(f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_loss / len(train_loader):.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val Accuracy: {val_accuracy:.2f}%")
 
         # Save the model weights for this fold
-        fold_model_path = os.path.join(model_save_dir, f"poker_model_fold{fold + 1}.pth")
+        fold_model_path = os.path.join(
+            model_save_dir, f"poker_model_fold{fold + 1}.pth")
         torch.save(model.state_dict(), fold_model_path)
         print(f"Model for Fold {fold + 1} saved to {fold_model_path}")
 
