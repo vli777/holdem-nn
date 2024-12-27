@@ -15,7 +15,6 @@ class PokerLinformerModel(nn.Module):
             num_layers (int): Number of Linformer layers.
         """
         super().__init__()
-
         # Projection layer to match Linformer input dimension
         self.input_projection = nn.Linear(input_dim, hidden_dim)
 

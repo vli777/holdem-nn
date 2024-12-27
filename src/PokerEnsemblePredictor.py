@@ -3,49 +3,51 @@ from PokerDataset import PokerDataset
 
 
 class PokerEnsemblePredictor:
-    def __init__(self, model_class, model_paths, input_dim, hidden_dim, output_dim, **kwargs):
+    def __init__(self, model_class, model_paths, input_dim, hidden_dim, output_dim, **model_kwargs):
         """
-        Initialize the ensemble predictor with multiple models.
+        Initialize the ensemble predictor with multiple model paths.
         Args:
-            model_class (nn.Module): The model class (e.g., PokerModel, PokerLinformerModel).
-            model_paths (list[str]): List of paths to the saved model weights.
+            model_class (nn.Module): The model class (e.g., PokerLinformerModel).
+            model_paths (list): List of paths to the saved model weights.
             input_dim (int): Number of input features.
             hidden_dim (int): Dimension of the hidden layer.
             output_dim (int): Number of output classes.
-            **kwargs: Additional arguments for the model (e.g., num_heads, num_layers, seq_len).
+            **model_kwargs: Additional keyword arguments for the model (e.g., seq_len, num_heads, num_layers).
         """
         self.models = []
         for path in model_paths:
             model = model_class(
-                input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **kwargs)
-            model.load_state_dict(torch.load(path))
-            model.eval()
+                input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **model_kwargs)
+            model.load_state_dict(torch.load(path, weights_only=True))
+            model.eval()  # Set to evaluation mode
             self.models.append(model)
 
         self.action_map = {0: "fold", 1: "call", 2: "raise"}
 
     def predict_action(self, sample_action):
         """
-        Aggregate predictions from an ensemble of models.
+        Predict the action using the ensemble of models.
         Args:
             sample_action (dict): A dictionary containing the hand state.
         Returns:
-            str: Final predicted action ("fold", "call", "raise").
+            str: Predicted action ("fold", "call", or "raise").
         """
         # Encode the state
         encoded_state = PokerDataset.encode_state(sample_action)
         input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
             0)  # Add batch dimension
 
-        # Aggregate predictions
+        # Aggregate predictions from all models
         outputs = []
         for model in self.models:
             with torch.no_grad():
                 outputs.append(model(input_tensor))
-        avg_output = torch.mean(torch.stack(
-            outputs), dim=0)  # Average predictions
+
+        # Average the outputs across the ensemble
+        avg_output = torch.mean(torch.stack(outputs), dim=0)
         predicted_action = torch.argmax(avg_output, dim=1).item()
 
+        # Map prediction to action name
         return self.action_map[predicted_action]
 
     def predict_with_confidence(self, sample_action, threshold=0.7):

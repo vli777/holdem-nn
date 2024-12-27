@@ -4,11 +4,20 @@ from PokerModel import PokerModel
 
 
 class PokerPredictor:
-    def __init__(self, model_path, input_dim, hidden_dim, output_dim):
-        """Initialize the predictor by loading the model."""
-        self.model = PokerModel(input_dim=input_dim,
-                                hidden_dim=hidden_dim, output_dim=output_dim)
-        self.model.load_state_dict(torch.load(model_path))
+    def __init__(self, model_class, model_path, input_dim, hidden_dim, output_dim, **model_kwargs):
+        """
+        Initialize the predictor by loading the model.
+        Args:
+            model_class (nn.Module): The model class (e.g., PokerModel, PokerLinformerModel).
+            model_path (str): Path to the saved model weights.
+            input_dim (int): Number of input features.
+            hidden_dim (int): Dimension of the hidden layer.
+            output_dim (int): Number of output classes.
+            **model_kwargs: Additional keyword arguments for the model (e.g., num_heads, num_layers, seq_len).
+        """
+        self.model = model_class(
+            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **model_kwargs)
+        self.model.load_state_dict(torch.load(model_path, weights_only=True))
         self.model.eval()  # Set the model to evaluation mode
 
         self.action_map = {0: "fold", 1: "call", 2: "raise"}
