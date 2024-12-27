@@ -1,6 +1,7 @@
 from linformer import Linformer
 import torch.nn as nn
 
+
 class PokerLinformerModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, seq_len, num_heads, num_layers):
         """
@@ -14,8 +15,9 @@ class PokerLinformerModel(nn.Module):
             num_layers (int): Number of Linformer layers.
         """
         super().__init__()
-        # Linear embedding for input features
-        self.embedding = nn.Linear(input_dim, hidden_dim)
+
+        # Projection layer to match Linformer input dimension
+        self.input_projection = nn.Linear(input_dim, hidden_dim)
 
         # Linformer encoder
         self.linformer = Linformer(
@@ -32,8 +34,14 @@ class PokerLinformerModel(nn.Module):
         self.classifier = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x):
-        # x: [batch_size, input_dim]
-        x = self.embedding(x)  # [batch_size, input_dim] -> [batch_size, hidden_dim]
-        x = self.linformer(x)  # [batch_size, hidden_dim] -> [batch_size, hidden_dim]
-        x = self.classifier(x.mean(dim=1))  # Aggregate across sequence (if seq_len > 1)
+        # Ensure x has shape [batch_size, seq_len, embedding_dim]
+        if x.ndim == 2:  # If input is [batch_size, embedding_dim]
+            # Add sequence length dimension, making it [batch_size, 1, embedding_dim]
+            x = x.unsqueeze(1)
+
+        x = self.input_projection(x)  # Project input_dim -> hidden_dim
+        x = self.linformer(x)  # [batch_size, seq_len, hidden_dim]
+        # Remove the sequence length dimension after Linformer
+        x = x.squeeze(1)
+        x = self.classifier(x)  # Final linear layer
         return x
