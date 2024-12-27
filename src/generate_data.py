@@ -232,19 +232,20 @@ def append_simulation_data(file_path, new_data):
     np.save(file_path, updated_data)
     print(f"Data saved to {file_path}. Total samples: {len(updated_data)}")
 
-# For timing purposes
-start_time = time.time()
+if __name__ == "__main__":
+    # For timing purposes
+    start_time = time.time()
 
-# Generate new simulation data
-game_data = simulate_texas_holdem(num_games=10000, bluffing_probability=0.2)
+    # Generate new simulation data
+    game_data = simulate_texas_holdem(num_games=10000, bluffing_probability=0.2)
 
-# Define the file path
-file_path = "../data/texas_holdem_data.npy"
+    # Define the file path
+    file_path = "../data/texas_holdem_data.npy"
 
-# Append new data to the file
-append_simulation_data(file_path, game_data)
+    # Append new data to the file
+    append_simulation_data(file_path, game_data)
 
-# Display time
-end_time = time.time()
-elapsed_time = end_time - start_time
-print(f"Total execution time: {elapsed_time:.2f} seconds")
+    # Display time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Total execution time: {elapsed_time:.2f} seconds")
