@@ -2,6 +2,7 @@ import eval7
 import random
 from generate_data import monte_carlo_hand_strength
 
+
 def randomize_sample_action():
     """
     Generate a random poker hand state.
@@ -43,16 +44,20 @@ def play_out_game(predictor, sample_action, num_players=6):
     deck.shuffle()
 
     # Remove known cards from the deck
-    known_cards = sample_action["hole_cards"] + sample_action["community_cards"]
+    known_cards = sample_action["hole_cards"] + \
+        sample_action["community_cards"]
     for card in known_cards:
         deck.cards.remove(card)
 
     # Predict the action
     predicted_action = predictor.predict_action(sample_action)
-    predicted_confidence = predictor.predict_with_confidence(sample_action, threshold=0.8)
+    predicted_confidence = predictor.predict_with_confidence(
+        sample_action, threshold=0.8)
 
-    print(f"Player's Hole Cards: {[str(card) for card in sample_action['hole_cards']]}")
-    print(f"Community Cards: {[str(card) for card in sample_action['community_cards']]}")
+    print(
+        f"Player's Hole Cards: {[str(card) for card in sample_action['hole_cards']]}")
+    print(
+        f"Community Cards: {[str(card) for card in sample_action['community_cards']]}")
     print(f"Predicted Action: {predicted_action}")
     print(f"Confidence Prediction: {predicted_confidence}")
 
@@ -65,7 +70,8 @@ def play_out_game(predictor, sample_action, num_players=6):
     # Simulate opponent hands
     opponent_hands = [deck.deal(2) for _ in range(num_players - 1)]
 
-    print(f"Opponent Hands: {[ [str(card) for card in hand] for hand in opponent_hands ]}")
+    print(
+        f"Opponent Hands: {[[str(card) for card in hand] for hand in opponent_hands]}")
 
     # Evaluate final hands
     player_hand_strength = eval7.evaluate(

@@ -1,4 +1,3 @@
-import eval7
 import logging
 from PokerLinformerModel import PokerLinformerModel
 from PokerPredictor import PokerPredictor
@@ -10,6 +9,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Path to model weights
 MODEL_PATH = "models/poker_model.pth"
+
 
 def main():
     # Model parameters
