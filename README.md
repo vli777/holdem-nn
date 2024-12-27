@@ -3,7 +3,7 @@ Inspired by Amortized Planning with Large-Scale Transformers: A Case Study on Ch
 
 Using the latest transformer models, the team was able to approach the leading poker AI performance using Monte Carlo Tree Search (MCTS)
 
-This project uses generated data instead of actual game play data for training. The model architecture still needs to be updated. For now, it is a simple neural net with Linear - Relu - Linear layers.
+This project uses generated data instead of actual game play data for training. 
 
 Instructions
 
@@ -11,3 +11,5 @@ Instructions
 2. Generate or place game data .npy files in data/ (see generate_data.py encoding methods to view format)
 3. Run train.py
 4. Test out a sample hand by running main.py
+
+to-do: convert main to FastAPI
