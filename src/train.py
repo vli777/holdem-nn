@@ -14,7 +14,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logging.info(f"Using device: {device}")
 
 # Paths
-DATA_PATH = "data/texas_holdem_data.npy"
+DATA_PATH = "data/texas_holdem_data.npz"
 MODEL_SAVE_DIR = "models"
 FULL_MODEL_PATH = f"{MODEL_SAVE_DIR}/poker_model_full.pth"
 

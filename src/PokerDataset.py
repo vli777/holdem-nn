@@ -9,8 +9,16 @@ class PokerDataset(Dataset):
         self.logger = logging.getLogger(__name__)
 
         try:
-            raw_data = np.load(data_path, allow_pickle=True)
-            if raw_data.size == 0:
+            # Load data based on file extension
+            if data_path.endswith('.npz'):
+                with np.load(data_path, allow_pickle=True) as data:
+                    raw_data = data['updated_data'] if 'updated_data' in data else data['arr_0']
+            elif data_path.endswith('.npy'):
+                raw_data = np.load(data_path, allow_pickle=True)
+            else:
+                raise ValueError("Unsupported file format. Use .npy or .npz.")
+
+            if len(raw_data) == 0:
                 raise ValueError("Loaded dataset is empty!")
 
             # Parse each game's actions into state-action pairs and precompute

@@ -73,22 +73,27 @@ def simulate_once(args):
 
     # Deal opponent and community cards
     opponent_hole_cards = deck.deal(2)
-    remaining_community_cards = community_cards + deck.deal(5 - len(community_cards))
+    remaining_community_cards = community_cards + \
+        deck.deal(5 - len(community_cards))
 
     # Evaluate hand strengths
     player_strength = eval7.evaluate(hole_cards + remaining_community_cards)
-    opponent_strength = eval7.evaluate(opponent_hole_cards + remaining_community_cards)
+    opponent_strength = eval7.evaluate(
+        opponent_hole_cards +
+        remaining_community_cards)
 
     return 1 if player_strength > opponent_strength else 0.5 if player_strength == opponent_strength else 0
 
 
-def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=1000, pool=None):
+def monte_carlo_hand_strength(
+        hole_cards, community_cards, num_simulations=1000, pool=None):
     """Estimate win probability using Monte Carlo simulation."""
     # Serialize cards
     hole_cards_serialized = [str(card) for card in hole_cards]
     community_cards_serialized = [str(card) for card in community_cards]
 
-    args = [(hole_cards_serialized, community_cards_serialized)] * num_simulations
+    args = [(hole_cards_serialized, community_cards_serialized)] * \
+        num_simulations
 
     if pool is None:
         with Pool() as pool:
