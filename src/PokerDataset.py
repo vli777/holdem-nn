@@ -6,29 +6,49 @@ import logging
 
 class PokerDataset(Dataset):
     def __init__(self, data_path):
+        self.logger = logging.getLogger(__name__)
+
         try:
             raw_data = np.load(data_path, allow_pickle=True)
             if raw_data.size == 0:
                 raise ValueError("Loaded dataset is empty!")
+
+            # Parse each game's actions into state-action pairs and precompute
+            # features
+            precomputed_data = []
+            for game in raw_data:
+                for action in game:
+                    try:
+                        state = self.encode_state(action)
+                        action_label = self.encode_action(action["action"])
+                        position = action.get("position", 0)
+                        player_id = action.get("player_id", 0)
+                        recent_action = action.get("recent_action", 0)
+
+                        if action_label != -1:
+                            precomputed_data.append(
+                                (state, action_label, position,
+                                 player_id, recent_action)
+                            )
+                    except KeyError as e:
+                        missing_keys = {k for k in ["hole_cards", "community_cards", "action", "hand_strength", "pot_odds"]
+                                        if k not in action}
+                        self.logger.warning(
+                            f"Missing keys: {missing_keys}, skipping action.")
+                    except Exception as e:
+                        self.logger.error(
+                            f"Unexpected error: {e}, skipping...")
+
+            if len(precomputed_data) == 0:
+                raise ValueError(
+                    "No valid data points were parsed from the dataset.")
+
+            # Convert precomputed data to a NumPy array for faster access
+            self.data = np.array(precomputed_data, dtype=object)
+
         except Exception as e:
-            logging.error(f"Failed to load data from {data_path}: {e}")
+            self.logger.error(f"Failed to load data from {data_path}: {e}")
             raise
-
-        self.data = []
-
-        # Parse each game's actions into state-action pairs
-        for game in raw_data:
-            for action in game:
-                try:
-                    state = self.encode_state(action)
-                    action_label = self.encode_action(action["action"])
-                    if action_label != -1:
-                        self.data.append((state, action_label))
-                except KeyError as e:
-                    logging.warning(
-                        f"Missing key {e} in action data, skipping...")
-                except Exception as e:
-                    logging.error(f"Unexpected error: {e}, skipping...")
 
     @staticmethod
     def encode_state(action):
@@ -51,23 +71,20 @@ class PokerDataset(Dataset):
         Returns:
             np.ndarray: A one-hot vector representing the cards.
         """
-        ranks = "23456789TJQKA"  # Rank order
-        suits = ["s", "h", "d", "c"]  # Suit order mapped from integers
+        ranks = "23456789TJQKA"
+        suits = ["s", "h", "d", "c"]
         vector = np.zeros(52)  # 52 cards in a deck
 
+        rank_map = {r: i for i, r in enumerate(ranks)}
+        suit_map = {s: i for i, s in enumerate(suits)}
+
         for card in cards:
-            # Convert rank to string if it's an integer
             rank = ranks[card.rank -
                          2] if isinstance(card.rank, int) else card.rank
-
-            # Convert suit to string if it's an integer
             suit = suits[card.suit] if isinstance(
                 card.suit, int) else card.suit
 
-            rank_index = ranks.index(rank)
-            suit_index = suits.index(suit)
-            card_index = rank_index * 4 + suit_index  # Unique index for each card
-            # Set the corresponding position in the vector
+            card_index = rank_map[rank] * 4 + suit_map[suit]
             vector[card_index] = 1
 
         return vector
@@ -76,12 +93,8 @@ class PokerDataset(Dataset):
     def encode_action(action):
         """Encodes action as a numerical label."""
         action_map = {"fold": 0, "call": 1, "raise": 2}
-
-        # If action is already an integer and valid, return it directly
-        if isinstance(action, int) and action in {0, 1, 2}:
-            return action
-
-        # Otherwise, map string actions
+        if isinstance(action, int):
+            return action if action in action_map.values() else -1
         return action_map.get(action, -1)
 
     def __len__(self):
@@ -91,5 +104,12 @@ class PokerDataset(Dataset):
         if idx < 0 or idx >= len(self.data):
             raise IndexError(
                 f"Index {idx} out of range for dataset of size {len(self.data)}")
-        state, action_label = self.data[idx]
-        return torch.tensor(state, dtype=torch.float32), torch.tensor(action_label, dtype=torch.long)
+        state, action_label, position, player_id, recent_action = self.data[idx]
+
+        return (
+            torch.tensor(state, dtype=torch.float32),
+            torch.tensor(action_label, dtype=torch.long),
+            torch.tensor(position, dtype=torch.long),
+            torch.tensor(player_id, dtype=torch.long),
+            torch.tensor(recent_action, dtype=torch.long),
+        )
