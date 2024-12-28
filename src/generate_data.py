@@ -237,7 +237,9 @@ def append_simulation_data(file_path, new_data):
     if os.path.exists(file_path):
         # Load existing data from .npz
         with np.load(file_path, allow_pickle=True) as data:
-            existing_data = data['arr_0'].tolist()
+            # Dynamically fetch the primary dataset key
+            primary_key = list(data.keys())[0]  # Assume first key is primary
+            existing_data = data[primary_key].tolist()
         updated_data = existing_data + new_data
     else:
         # No existing data; use new data as the dataset
@@ -256,6 +258,7 @@ if __name__ == "__main__":
             bluffing_strategy=lambda: random.uniform(
                 0.2,
                 1))
+
     file_path = "data/texas_holdem_data.npz"
     append_simulation_data(file_path, game_data)
     elapsed_time = time.time() - start_time
