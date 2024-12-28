@@ -1,10 +1,11 @@
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import torch.nn as nn
 import logging
 from PokerDataset import PokerDataset
 from PokerLinformerModel import PokerLinformerModel
 from cross_validation import k_fold_cross_validation
+from torch.utils.tensorboard import SummaryWriter
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,6 +16,7 @@ logging.info(f"Using device: {device}")
 # Paths
 DATA_PATH = "data/texas_holdem_data.npy"
 MODEL_SAVE_DIR = "models"
+FULL_MODEL_PATH = f"{MODEL_SAVE_DIR}/poker_model_full.pth"
 
 # Hyperparameters
 num_epochs = 10
@@ -83,30 +85,108 @@ model = PokerLinformerModel(
     output_dim=output_dim,
     num_heads=num_heads,
     num_layers=num_layers,
-    seq_len=1
+    seq_len=seq_len
 ).to(device)
 
 # Initialize optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
 criterion = nn.CrossEntropyLoss()
 
-# Train the model
-model.train()
-running_loss = 0.0
+# Split dataset into training and validation sets for final training
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    pin_memory=True,
+    num_workers=4)
+val_loader = DataLoader(
+    val_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    pin_memory=True,
+    num_workers=4)
+
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode='min', patience=3, factor=0.5)
+scaler = torch.cuda.amp.GradScaler()
+
+writer = SummaryWriter(log_dir="logs")
+
+# Final Training Loop
 for epoch in range(num_epochs):
-    for states, actions in DataLoader(dataset, batch_size=32, shuffle=True):
-        states, actions = states.to(device), actions.to(device)
+    model.train()
+    running_loss = 0.0
+
+    for states, actions, positions, player_ids, recent_actions in train_loader:
+        states, actions, positions, player_ids, recent_actions = (
+            states.to(device),
+            actions.to(device),
+            positions.to(device),
+            player_ids.to(device),
+            recent_actions.to(device),
+        )
+
+        with torch.amp.autocast(device_type='cuda', enabled=device.type == 'cuda'):
+            policy_logits, _ = model(
+                states, positions, player_ids, recent_actions)
+            loss = criterion(policy_logits, actions)
         optimizer.zero_grad()
-        outputs = model(states)
-        loss = criterion(outputs, actions)
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
         running_loss += loss.item()
 
-    avg_loss = running_loss / len(dataset)
-    logging.info(f"Epoch {epoch + 1}/{num_epochs}, Loss: {avg_loss:.4f}")
+    # Validation
+    model.eval()
+    val_loss = 0.0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for states, actions, positions, player_ids, recent_actions in val_loader:
+            states, actions, positions, player_ids, recent_actions = (
+                states.to(device),
+                actions.to(device),
+                positions.to(device),
+                player_ids.to(device),
+                recent_actions.to(device),
+            )
+
+            policy_logits, _ = model(
+                states, positions, player_ids, recent_actions)
+            loss = criterion(policy_logits, actions)
+            val_loss += loss.item()
+
+            # Accuracy
+            _, predicted = torch.max(policy_logits, 1)
+            total += actions.size(0)
+            correct += (predicted == actions).sum().item()
+
+    # Log epoch metrics
+    train_loss = running_loss / max(len(train_loader), 1)
+    val_loss = val_loss / max(len(val_loader), 1)
+    accuracy = correct / total * 100 if total > 0 else 0
+
+    logging.info(
+        f"Epoch {epoch + 1}/{num_epochs}, "
+        f"Train Loss: {train_loss:.4f}, "
+        f"Val Loss: {val_loss:.4f}, "
+        f"Accuracy: {accuracy:.2f}%"
+    )
+
+    writer.add_scalar("Loss/train", train_loss, epoch)
+    writer.add_scalar("Loss/val", val_loss, epoch)
+    writer.add_scalar("Accuracy", accuracy, epoch)
+
+    scheduler.step(val_loss)  # Adjust LR based on validation loss
+
+writer.close()
 
 # Save the model
-torch.save(model.state_dict(), "models/poker_model.pth")
-logging.info("Final model trained on full dataset saved as 'poker_model.pth'")
+torch.save(model.state_dict(), FULL_MODEL_PATH)
+logging.info(
+    f"Final model trained on full dataset saved as '{FULL_MODEL_PATH}'")
