@@ -18,7 +18,6 @@ def randomize_sample_action():
     # Deal a random number of community cards (0 to 5)
     community_cards = deck.deal(random.randint(0, 5))
 
-    # Placeholder hand strength (use Monte Carlo or another method to calculate)
     hand_strength = monte_carlo_hand_strength(hole_cards, community_cards)
 
     # Random pot odds (example range: 0.1 to 0.9)

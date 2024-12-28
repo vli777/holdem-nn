@@ -5,7 +5,8 @@ import os
 import logging
 
 
-def k_fold_cross_validation(dataset, device, model_class, model_params, criterion, optimizer_class, optimizer_params, k=5, epochs=10, batch_size=32, model_save_dir="models"):
+def k_fold_cross_validation(dataset, device, model_class, model_params, criterion, optimizer_class,
+                            optimizer_params, k=5, epochs=10, batch_size=32, model_save_dir="models"):
     """
     Perform K-Fold Cross-Validation and save model weights for each fold.
     Args:
@@ -29,26 +30,34 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
     fold_results = []
     patience_limit = 3  # Set a threshold for stopping
 
-    for fold, (train_indices, val_indices) in enumerate(kfold.split(dataset.data, [d[1] for d in dataset.data])): # (fold, call, raise)
+    for fold, (train_indices, val_indices) in enumerate(
+            # (fold, call, raise)
+            kfold.split(dataset.data, [d[1] for d in dataset.data])):
         logging.info(f"Fold {fold + 1}/{k}")
-        
+
         train_subset = Subset(dataset, train_indices)
         val_subset = Subset(dataset, val_indices)
 
-        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(
+            train_subset,
+            batch_size=batch_size,
+            shuffle=True)
+        val_loader = DataLoader(
+            val_subset,
+            batch_size=batch_size,
+            shuffle=False)
 
         model = model_class(**model_params).to(device)
         optimizer = optimizer_class(model.parameters(), **optimizer_params)
-        
+
         # Reset early stopping vars
-        best_val_loss = float("inf") 
+        best_val_loss = float("inf")
         patience_counter = 0
 
         for epoch in range(epochs):
             model.train()
             train_loss = 0.0
-            
+
             for states, actions, positions, player_ids, recent_actions in train_loader:
                 states, actions, positions, player_ids, recent_actions = (
                     states.to(device),
@@ -60,8 +69,9 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
                 # Add seq_len dimension if necessary
                 if states.ndim == 2:
                     states = states.unsqueeze(1)
-                    
-                policy_logits, _ = model(states, positions, player_ids, recent_actions)
+
+                policy_logits, _ = model(
+                    states, positions, player_ids, recent_actions)
                 loss = criterion(policy_logits, actions)
                 optimizer.zero_grad()
                 loss.backward()
@@ -73,7 +83,7 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
             val_loss = 0.0
             correct = 0
             total = 0
-            
+
             with torch.no_grad():
                 for states, actions, positions, player_ids, recent_actions in val_loader:
                     # Move data to device
@@ -87,9 +97,10 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
                     # Ensure sequence dimension
                     if states.ndim == 2:
                         states = states.unsqueeze(1)
-                        
+
                     # Model inference
-                    policy_logits, _ = model(states, positions, player_ids, recent_actions)
+                    policy_logits, _ = model(
+                        states, positions, player_ids, recent_actions)
 
                     # Loss calculation
                     loss = criterion(policy_logits, actions)
@@ -102,8 +113,10 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
 
             # Update validation loss and accuracy after all batches
             val_accuracy = correct / total * 100
-            avg_train_loss = train_loss / len(train_loader) if len(train_loader) > 0 else float('inf')
-            avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else float('inf')
+            avg_train_loss = train_loss / \
+                len(train_loader) if len(train_loader) > 0 else float('inf')
+            avg_val_loss = val_loss / \
+                len(val_loader) if len(val_loader) > 0 else float('inf')
 
             # Early stopping check
             if avg_val_loss < best_val_loss:
@@ -117,7 +130,7 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
                 if patience_counter >= patience_limit:
                     logging.info(f"Early stopping at epoch {epoch + 1}")
                     break
-        
+
             # Log epoch metrics
             logging.info(
                 f"Fold {fold + 1} Epoch {epoch + 1}/{epochs} - "

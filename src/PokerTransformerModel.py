@@ -3,7 +3,8 @@ import torch.nn as nn
 
 
 class PokerTransformerModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, num_heads, num_layers, max_seq_len=1):
+    def __init__(self, input_dim, hidden_dim, output_dim,
+                 num_heads, num_layers, max_seq_len=1):
         """
         Transformer-based model for predicting poker actions.
         Args:

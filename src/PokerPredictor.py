@@ -4,7 +4,8 @@ from PokerModel import PokerModel
 
 
 class PokerPredictor:
-    def __init__(self, model_class, model_path, input_dim, hidden_dim, output_dim, **model_kwargs):
+    def __init__(self, model_class, model_path, input_dim,
+                 hidden_dim, output_dim, **model_kwargs):
         """
         Initialize the predictor by loading the model.
         Args:

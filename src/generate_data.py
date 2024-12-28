@@ -57,7 +57,8 @@ def decide_action(hand_strength, pot_odds,
         return "fold"
 
 
-def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=1000):
+def monte_carlo_hand_strength(
+        hole_cards, community_cards, num_simulations=1000):
     """
     Estimate win probability using Monte Carlo simulation.
     Args:
@@ -141,7 +142,8 @@ def encode_action(action):
     return action_map[action]
 
 
-def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_strategy=None):
+def simulate_texas_holdem(num_players=6, num_games=1000,
+                          bluffing_strategy=None):
     """
     Simulate Texas Hold'em games and collect state-action pairs.
     Args:
@@ -180,7 +182,7 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_strategy=None)
             hand_strength = monte_carlo_hand_strength(
                 player_hole_cards[player], community_cards
             )
-            pot_odds = current_pot / (current_pot + bet_to_call) 
+            pot_odds = current_pot / (current_pot + bet_to_call)
             action = decide_action(
                 hand_strength, pot_odds, bluffing_probability)
 
@@ -207,8 +209,9 @@ def simulate_texas_holdem(num_players=6, num_games=1000, bluffing_strategy=None)
             for player in range(num_players):
                 if actions[player]["action"] == 0:  # Skip folded players
                     continue
-                
-                bet_to_call = random.randint(2, 10) # Random bet size for each round
+
+                bet_to_call = random.randint(
+                    2, 10)  # Random bet size for each round
                 current_pot += bet_to_call
                 hand_strength = monte_carlo_hand_strength(
                     player_hole_cards[player], community_cards
@@ -249,7 +252,7 @@ def append_simulation_data(file_path, new_data):
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
         print(f"Created directory: {dir_name}")
-        
+
     if os.path.exists(file_path):
         # Load existing data
         existing_data = np.load(file_path, allow_pickle=True).tolist()

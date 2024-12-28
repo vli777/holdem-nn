@@ -3,7 +3,8 @@ from PokerDataset import PokerDataset
 
 
 class PokerEnsemblePredictor:
-    def __init__(self, model_class, model_paths, input_dim, hidden_dim, output_dim, **model_kwargs):
+    def __init__(self, model_class, model_paths, input_dim,
+                 hidden_dim, output_dim, **model_kwargs):
         """
         Initialize the ensemble predictor with multiple model paths.
         Args:
