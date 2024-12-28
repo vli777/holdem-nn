@@ -58,25 +58,44 @@ def decide_action(hand_strength, pot_odds,
         return "fold"
 
 
-def monte_carlo_hand_strength(
-        hole_cards, community_cards, num_simulations=1000, pool=None):
-    """Estimate win probability using Monte Carlo simulation."""
-    def simulate_once(_):
-        deck = eval7.Deck()
-        for card in hole_cards + community_cards:
-            deck.cards.remove(card)
-        deck.shuffle()
-        opponent_hole_cards = deck.deal(2)
-        remaining_community_cards = community_cards + \
-            deck.deal(5 - len(community_cards))
-        player_strength = eval7.evaluate(
-            hole_cards + remaining_community_cards)
-        opponent_strength = eval7.evaluate(
-            opponent_hole_cards + remaining_community_cards)
-        return 1 if player_strength > opponent_strength else 0.5 if player_strength == opponent_strength else 0
+def simulate_once(args):
+    hole_cards, community_cards = args
 
-    pool = pool or Pool()
-    results = pool.map(simulate_once, range(num_simulations))
+    # Deserialize the cards
+    hole_cards = [eval7.Card(c) for c in hole_cards]
+    community_cards = [eval7.Card(c) for c in community_cards]
+
+    # Deck setup
+    deck = eval7.Deck()
+    for card in hole_cards + community_cards:
+        deck.cards.remove(card)
+    deck.shuffle()
+
+    # Deal opponent and community cards
+    opponent_hole_cards = deck.deal(2)
+    remaining_community_cards = community_cards + deck.deal(5 - len(community_cards))
+
+    # Evaluate hand strengths
+    player_strength = eval7.evaluate(hole_cards + remaining_community_cards)
+    opponent_strength = eval7.evaluate(opponent_hole_cards + remaining_community_cards)
+
+    return 1 if player_strength > opponent_strength else 0.5 if player_strength == opponent_strength else 0
+
+
+def monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=1000, pool=None):
+    """Estimate win probability using Monte Carlo simulation."""
+    # Serialize cards
+    hole_cards_serialized = [str(card) for card in hole_cards]
+    community_cards_serialized = [str(card) for card in community_cards]
+
+    args = [(hole_cards_serialized, community_cards_serialized)] * num_simulations
+
+    if pool is None:
+        with Pool() as pool:
+            results = pool.map(simulate_once, args)
+    else:
+        results = pool.map(simulate_once, args)
+
     return sum(results) / num_simulations
 
 
@@ -228,7 +247,7 @@ if __name__ == "__main__":
     start_time = time.time()
     with Pool() as pool:
         game_data = simulate_texas_holdem(
-            num_games=1000,
+            num_games=10,
             bluffing_strategy=lambda: random.uniform(
                 0.2,
                 1))
