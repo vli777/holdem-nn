@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import eval7
 import random
 import numpy as np
@@ -58,45 +59,24 @@ def decide_action(hand_strength, pot_odds,
 
 
 def monte_carlo_hand_strength(
-        hole_cards, community_cards, num_simulations=1000):
-    """
-    Estimate win probability using Monte Carlo simulation.
-    Args:
-        hole_cards (list[eval7.Card]): Player's hole cards.
-        community_cards (list[eval7.Card]): Community cards on the table.
-        num_simulations (int): Number of simulations to run.
-    Returns:
-        float: Estimated win probability (0 to 1).
-    """
+        hole_cards, community_cards, num_simulations=1000, pool=None):
+    """Estimate win probability using Monte Carlo simulation."""
     def simulate_once(_):
-        # Create a fresh deck for every simulation
         deck = eval7.Deck()
-
-        # Remove known cards from the deck
-        used_cards = hole_cards + community_cards
-        for card in used_cards:
+        for card in hole_cards + community_cards:
             deck.cards.remove(card)
-
-        # Shuffle the deck
         deck.shuffle()
-
-        # Deal opponent's hole cards and remaining community cards
         opponent_hole_cards = deck.deal(2)
         remaining_community_cards = community_cards + \
             deck.deal(5 - len(community_cards))
-
-        # Evaluate hands
-        player_hand_strength = eval7.evaluate(
+        player_strength = eval7.evaluate(
             hole_cards + remaining_community_cards)
-        opponent_hand_strength = eval7.evaluate(
+        opponent_strength = eval7.evaluate(
             opponent_hole_cards + remaining_community_cards)
+        return 1 if player_strength > opponent_strength else 0.5 if player_strength == opponent_strength else 0
 
-        return 1 if player_hand_strength > opponent_hand_strength else 0.5 if player_hand_strength == opponent_hand_strength else 0
-
-    # Compute win probability
-    with Pool() as pool:
-        results = pool.map(simulate_once, range(num_simulations))
-
+    pool = pool or Pool()
+    results = pool.map(simulate_once, range(num_simulations))
     return sum(results) / num_simulations
 
 
@@ -144,87 +124,65 @@ def encode_action(action):
 
 def simulate_texas_holdem(num_players=6, num_games=1000,
                           bluffing_strategy=None):
-    """
-    Simulate Texas Hold'em games and collect state-action pairs.
-    Args:
-        num_players (int): Number of players in the game.
-        num_games (int): Number of games to simulate.
-        bluffing_probability (float): Bluffing probability for players.
-    Returns:
-        list: Encoded state-action pairs for training.
-    """
+    """Simulate Texas Hold'em games and collect state-action pairs."""
     game_data = []
     bluffing_probability = bluffing_strategy() if bluffing_strategy else 0.2
 
-    for _ in range(num_games):
-        # Create a fresh deck for each game
+    for _ in tqdm(range(num_games), desc="Simulating Games"):
         deck = eval7.Deck()
         deck.shuffle()
-
-        # Deal hole cards for all players
         player_hole_cards = [deck.deal(2) for _ in range(num_players)]
-
-        # Assign player positions (e.g., 0=dealer, 1=small blind, etc.)
         positions = list(range(num_players))
-        random.shuffle(positions)  # Shuffle positions for each game
-
-        # Initialize community cards and game state
+        random.shuffle(positions)
         community_cards = []
         actions = []
-        player_ids = list(range(num_players))  # Unique player IDs for the game
-        current_pot = 0  # Total pot size
-        min_bet = 2  # Starting bet (small blind)
+        player_ids = list(range(num_players))
+        current_pot = 0
+        min_bet = 2
 
-        # Pre-flop round
         for player in range(num_players):
-            bet_to_call = min_bet  # Simplify for simulation
+            bet_to_call = min_bet
             current_pot += bet_to_call
             hand_strength = monte_carlo_hand_strength(
-                player_hole_cards[player], community_cards
-            )
+                player_hole_cards[player], community_cards)
             pot_odds = current_pot / (current_pot + bet_to_call)
             action = decide_action(
                 hand_strength, pot_odds, bluffing_probability)
-
             encoded_state = encode_state(
-                player_hole_cards[player], community_cards, hand_strength, pot_odds
-            )
+                player_hole_cards[player],
+                community_cards,
+                hand_strength,
+                pot_odds)
             encoded_action = encode_action(action)
+            actions.append({"state": encoded_state,
+                            "action": encoded_action,
+                            "position": positions[player],
+                            "player_id": player_ids[player],
+                            "recent_action": encoded_action,
+                            "bet_to_call": bet_to_call,
+                            "pot_odds": pot_odds})
 
-            actions.append({
-                "state": encoded_state,
-                "action": encoded_action,
-                "position": positions[player],  # Include player position
-                "player_id": player_ids[player],  # Include player ID
-                "recent_action": encoded_action,  # Track recent action
-                "bet_to_call": bet_to_call,
-                "pot_odds": pot_odds
-            })
-
-        # Simulate flop, turn, river rounds
-        # Flop (3 cards), turn (1 card), river (1 card)
         for round_cards in [3, 1, 1]:
+            if len(deck.cards) < round_cards:
+                break
             community_cards += deck.deal(round_cards)
 
             for player in range(num_players):
-                if actions[player]["action"] == 0:  # Skip folded players
+                if actions[player]["action"] == 0:
                     continue
-
-                bet_to_call = random.randint(
-                    2, 10)  # Random bet size for each round
+                bet_to_call = random.randint(2, 10)
                 current_pot += bet_to_call
                 hand_strength = monte_carlo_hand_strength(
-                    player_hole_cards[player], community_cards
-                )
+                    player_hole_cards[player], community_cards)
                 pot_odds = current_pot / (current_pot + bet_to_call)
                 action = decide_action(
                     hand_strength, pot_odds, bluffing_probability)
-
                 encoded_state = encode_state(
-                    player_hole_cards[player], community_cards, hand_strength, pot_odds
-                )
+                    player_hole_cards[player],
+                    community_cards,
+                    hand_strength,
+                    pot_odds)
                 encoded_action = encode_action(action)
-
                 actions[player] = {
                     "state": encoded_state,
                     "action": encoded_action,
@@ -232,10 +190,8 @@ def simulate_texas_holdem(num_players=6, num_games=1000,
                     "player_id": player_ids[player],
                     "recent_action": encoded_action,
                     "bet_to_call": bet_to_call,
-                    "pot_odds": pot_odds
-                }
+                    "pot_odds": pot_odds}
 
-        # Append game actions
         game_data.append(actions)
 
     return game_data
@@ -253,35 +209,30 @@ def append_simulation_data(file_path, new_data):
         os.makedirs(dir_name)
         print(f"Created directory: {dir_name}")
 
+    updated_data = []
     if os.path.exists(file_path):
-        # Load existing data
-        existing_data = np.load(file_path, allow_pickle=True).tolist()
-        # Append new data
+        # Load existing data from .npz
+        with np.load(file_path, allow_pickle=True) as data:
+            existing_data = data['arr_0'].tolist()
         updated_data = existing_data + new_data
     else:
         # No existing data; use new data as the dataset
         updated_data = new_data
 
     # Save the updated dataset
-    np.savez_compressed(file_path, updated_data)
+    np.savez_compressed(file_path, updated_data=updated_data)
     print(f"Data saved to {file_path}. Total samples: {len(updated_data)}")
 
 
 if __name__ == "__main__":
-    # For timing purposes
     start_time = time.time()
-
-    # Generate new simulation data
-    game_data = simulate_texas_holdem(
-        num_games=1000, bluffing_strategy=random.uniform(0.2, 1))
-
-    # Define the file path
-    file_path = "data/texas_holdem_data.npy"
-
-    # Append new data to the file
+    with Pool() as pool:
+        game_data = simulate_texas_holdem(
+            num_games=1000,
+            bluffing_strategy=lambda: random.uniform(
+                0.2,
+                1))
+    file_path = "data/texas_holdem_data.npz"
     append_simulation_data(file_path, game_data)
-
-    # Display time
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+    elapsed_time = time.time() - start_time
     print(f"Total execution time: {elapsed_time:.2f} seconds")

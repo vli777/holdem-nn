@@ -1,6 +1,7 @@
 annotated-types==0.7.0
 anyio==4.7.0
 autopep8==2.3.1
+colorama==0.4.6
 eval7==0.1.10
 fastapi==0.115.6
 filelock==3.16.1
@@ -29,4 +30,5 @@ threadpoolctl==3.5.0
 torch==2.5.1+cu118
 torchaudio==2.5.1+cu118
 torchvision==0.20.1+cu118
+tqdm==4.67.1
 typing_extensions==4.12.2
