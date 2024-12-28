@@ -1,7 +1,8 @@
 import torch
 from torch.utils.data import DataLoader, Subset
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 import os
+import logging
 
 
 def k_fold_cross_validation(dataset, device, model_class, model_params, criterion, optimizer_class, optimizer_params, k=5, epochs=10, batch_size=32, model_save_dir="models"):
@@ -23,40 +24,46 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
         list: Results for each fold (train loss, validation loss, accuracy).
     """
     os.makedirs(model_save_dir, exist_ok=True)  # Ensure the directory exists
-    kfold = KFold(n_splits=k, shuffle=True, random_state=42)
+    kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
 
     fold_results = []
+    patience_limit = 3  # Set a threshold for stopping
 
-    for fold, (train_indices, val_indices) in enumerate(kfold.split(dataset)):
-        print(f"Fold {fold + 1}/{k}")
-
-        # Split dataset into training and validation sets
+    for fold, (train_indices, val_indices) in enumerate(kfold.split(dataset.data, [d[1] for d in dataset.data])): # (fold, call, raise)
+        logging.info(f"Fold {fold + 1}/{k}")
+        
         train_subset = Subset(dataset, train_indices)
         val_subset = Subset(dataset, val_indices)
 
-        train_loader = DataLoader(
-            train_subset, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(
-            val_subset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
-        # Initialize model, optimizer, and criterion
         model = model_class(**model_params).to(device)
         optimizer = optimizer_class(model.parameters(), **optimizer_params)
+        
+        # Reset early stopping vars
+        best_val_loss = float("inf") 
+        patience_counter = 0
 
-        # Training loop
         for epoch in range(epochs):
             model.train()
             train_loss = 0.0
-
-            for states, actions in train_loader:
-                states, actions = states.to(device), actions.to(device)
-                # Ensure states have sequence dimension
+            
+            for states, actions, positions, player_ids, recent_actions in train_loader:
+                states, actions, positions, player_ids, recent_actions = (
+                    states.to(device),
+                    actions.to(device),
+                    positions.to(device),
+                    player_ids.to(device),
+                    recent_actions.to(device),
+                )
+                # Add seq_len dimension if necessary
                 if states.ndim == 2:
-                    # Add sequence length dimension
                     states = states.unsqueeze(1)
+                    
+                policy_logits, _ = model(states, positions, player_ids, recent_actions)
+                loss = criterion(policy_logits, actions)
                 optimizer.zero_grad()
-                outputs = model(states)
-                loss = criterion(outputs, actions)
                 loss.backward()
                 optimizer.step()
                 train_loss += loss.item()
@@ -66,33 +73,65 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
             val_loss = 0.0
             correct = 0
             total = 0
-
+            
             with torch.no_grad():
-                for states, actions in val_loader:
-                    states, actions = states.to(device), actions.to(device)
-                    outputs = model(states)
-                    loss = criterion(outputs, actions)
+                for states, actions, positions, player_ids, recent_actions in val_loader:
+                    # Move data to device
+                    states, actions, positions, player_ids, recent_actions = (
+                        states.to(device),
+                        actions.to(device),
+                        positions.to(device),
+                        player_ids.to(device),
+                        recent_actions.to(device),
+                    )
+                    # Ensure sequence dimension
+                    if states.ndim == 2:
+                        states = states.unsqueeze(1)
+                        
+                    # Model inference
+                    policy_logits, _ = model(states, positions, player_ids, recent_actions)
+
+                    # Loss calculation
+                    loss = criterion(policy_logits, actions)
                     val_loss += loss.item()
 
                     # Calculate accuracy
-                    _, predicted = torch.max(outputs, 1)
+                    _, predicted = torch.max(policy_logits, 1)
                     total += actions.size(0)
                     correct += (predicted == actions).sum().item()
 
+            # Update validation loss and accuracy after all batches
             val_accuracy = correct / total * 100
-            print(f"Epoch {epoch + 1}/{epochs} - Train Loss: {train_loss / len(train_loader):.4f}, Val Loss: {val_loss / len(val_loader):.4f}, Val Accuracy: {val_accuracy:.2f}%")
+            avg_train_loss = train_loss / len(train_loader) if len(train_loader) > 0 else float('inf')
+            avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else float('inf')
 
-        # Save the model weights for this fold
-        fold_model_path = os.path.join(
-            model_save_dir, f"poker_model_fold{fold + 1}.pth")
-        torch.save(model.state_dict(), fold_model_path)
-        print(f"Model for Fold {fold + 1} saved to {fold_model_path}")
+            # Early stopping check
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                patience_counter = 0
+                fold_model_path = f"{model_save_dir}/best_model_fold{fold + 1}.pth"
+                torch.save(model.state_dict(), fold_model_path)
+                logging.info(f"New best model saved for Fold {fold + 1}")
+            else:
+                patience_counter += 1
+                if patience_counter >= patience_limit:
+                    logging.info(f"Early stopping at epoch {epoch + 1}")
+                    break
+        
+            # Log epoch metrics
+            logging.info(
+                f"Fold {fold + 1} Epoch {epoch + 1}/{epochs} - "
+                f"Train Loss: {avg_train_loss:.4f}, "
+                f"Validation Loss: {avg_val_loss:.4f}, "
+                f"Validation Accuracy: {val_accuracy:.2f}%, "
+                f"Patience Counter: {patience_counter}/{patience_limit}"
+            )
 
         # Record fold results
         fold_results.append({
             'fold': fold + 1,
-            'train_loss': train_loss / len(train_loader),
-            'val_loss': val_loss / len(val_loader),
+            'train_loss': avg_train_loss,
+            'val_loss': avg_val_loss,
             'val_accuracy': val_accuracy
         })
 
