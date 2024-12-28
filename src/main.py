@@ -3,17 +3,26 @@ from PokerLinformerModel import PokerLinformerModel
 from PokerPredictor import PokerPredictor
 from PokerEnsemblePredictor import PokerEnsemblePredictor
 from simulate import randomize_sample_action, play_out_game
+import os
+from glob import glob
+from PokerDataset import PokerDataset
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 
-# Path to model weights
-MODEL_PATH = "models/poker_model.pth"
-
+# Path to model directory
+MODEL_DIR = "models"
+FULL_MODEL_PATH = os.path.join(MODEL_DIR, "poker_model.pth")
 
 def main():
+    # Check for the full model
+    if not os.path.exists(FULL_MODEL_PATH):
+        logging.error(f"Full model not found at {FULL_MODEL_PATH}. Ensure the model is trained and saved.")
+        exit(1)
+    
     # Model parameters
-    input_dim = 106  # Update based on your dataset format
+    sample_encoded_state = PokerDataset.encode_state(randomize_sample_action())
+    input_dim = len(sample_encoded_state)
     hidden_dim = 128
     output_dim = 3
     num_heads = 4
@@ -23,7 +32,7 @@ def main():
     # Initialize the single predictor
     predictor = PokerPredictor(
         model_class=PokerLinformerModel,
-        model_path=MODEL_PATH,
+        model_path=FULL_MODEL_PATH,
         input_dim=input_dim,
         hidden_dim=hidden_dim,
         output_dim=output_dim,
@@ -36,14 +45,25 @@ def main():
     sample_action = randomize_sample_action()
 
     # Display the initial state
-    print("\n--- Single Model Prediction ---")
+    logging.info("--- Single Model Prediction ---")
     predictor.display_hand(sample_action)
-    print("Predicted Action:", predictor.predict_action(sample_action))
+    logging.info(f"Predicted Action: {predictor.predict_action(sample_action)}")
+
+    # Dynamically find fold models
+    fold_model_paths = glob(os.path.join(MODEL_DIR, "*fold*.pth"))
+    if not fold_model_paths:
+        logging.warning("No fold models found. Proceeding with the full model only.")
+        play_out_game(predictor, sample_action, num_players=6)
+        return
+
+    # Include the full model in the ensemble
+    model_paths = [FULL_MODEL_PATH] + fold_model_paths
+    logging.info(f"Found {len(model_paths)} models for ensemble: {model_paths}")
 
     # Initialize the ensemble predictor
     ensemble_predictor = PokerEnsemblePredictor(
         model_class=PokerLinformerModel,
-        model_paths=[f"models/poker_model_fold{i}.pth" for i in range(1, 6)],
+        model_paths=model_paths,
         input_dim=input_dim,
         hidden_dim=hidden_dim,
         output_dim=output_dim,
@@ -53,14 +73,15 @@ def main():
     )
 
     # Perform ensemble predictions
-    print("\n--- Ensemble Model Prediction ---")
-    print("Predicted Action (Ensemble):",
-          ensemble_predictor.predict_action(sample_action))
-    print("Predicted Action with Confidence:",
-          ensemble_predictor.predict_with_confidence(sample_action, threshold=0.8))
+    logging.info("\n--- Ensemble Model Prediction ---")
+    action_with_confidence = ensemble_predictor.predict_with_confidence(sample_action, threshold=0.8)
+    if action_with_confidence == "uncertain":
+        logging.warning("Prediction confidence is too low. Action: uncertain.")
+    else:
+        logging.info(f"Predicted Action with Confidence: {action_with_confidence}")
 
     # Simulate and play out the game
-    print("\n--- Simulated Game ---")
+    logging.info("\n--- Simulated Game ---")
     play_out_game(ensemble_predictor, sample_action, num_players=6)
 
 
