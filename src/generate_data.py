@@ -1,3 +1,4 @@
+import logging
 from tqdm import tqdm
 import eval7
 import random
@@ -5,6 +6,7 @@ import numpy as np
 import os
 import time
 from multiprocessing import Pool
+from utils import encode_state, encode_action
 
 
 def evaluate_hand(hole_cards, community_cards):
@@ -59,6 +61,17 @@ def decide_action(hand_strength, pot_odds,
 
 
 def simulate_once(args):
+    """
+    Simulates one hand of Texas Hold'em between a player and an opponent.
+    
+    Args:
+        args (tuple): A tuple containing:
+            - hole_cards (list[str]): The player's hole cards (e.g., ['As', 'Kd']).
+            - community_cards (list[str]): Known community cards (e.g., ['2h', '3c']).
+    
+    Returns:
+        float: 1 if player wins, 0.5 if tie, 0 if opponent wins.
+    """
     hole_cards, community_cards = args
 
     # Deserialize the cards
@@ -69,20 +82,28 @@ def simulate_once(args):
     deck = eval7.Deck()
     for card in hole_cards + community_cards:
         deck.cards.remove(card)
+
+    # Check if deck has enough cards to continue
+    if len(deck.cards) < 7 - len(community_cards):  # 2 for opponent + remaining community
+        raise ValueError("Not enough cards left in the deck to complete the hand.")
+
     deck.shuffle()
 
-    # Deal opponent and community cards
+    # Deal opponent hole cards and remaining community cards
     opponent_hole_cards = deck.deal(2)
-    remaining_community_cards = community_cards + \
-        deck.deal(5 - len(community_cards))
+    remaining_community_cards = community_cards + deck.deal(5 - len(community_cards))
 
     # Evaluate hand strengths
     player_strength = eval7.evaluate(hole_cards + remaining_community_cards)
-    opponent_strength = eval7.evaluate(
-        opponent_hole_cards +
-        remaining_community_cards)
+    opponent_strength = eval7.evaluate(opponent_hole_cards + remaining_community_cards)
 
-    return 1 if player_strength > opponent_strength else 0.5 if player_strength == opponent_strength else 0
+    # Determine outcome
+    if player_strength > opponent_strength:
+        return 1  # Player wins
+    elif player_strength == opponent_strength:
+        return 0.5  # Tie
+    else:
+        return 0  # Opponent wins
 
 
 def monte_carlo_hand_strength(
@@ -102,48 +123,6 @@ def monte_carlo_hand_strength(
         results = pool.map(simulate_once, args)
 
     return sum(results) / num_simulations
-
-
-def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
-    """Encodes game state as a feature vector."""
-    hole_cards_vector = cards_to_vector(hole_cards)
-    community_cards_vector = cards_to_vector(community_cards)
-    return np.concatenate(
-        [hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]])
-
-
-def cards_to_vector(cards):
-    """
-    Encodes a list of eval7.Card objects as a one-hot vector.
-    Args:
-        cards (list[eval7.Card]): List of eval7.Card objects.
-    Returns:
-        np.ndarray: A one-hot vector representing the cards.
-    """
-    ranks = "23456789TJQKA"  # Rank order
-    suits = ["s", "h", "d", "c"]  # Suit order mapped from integers
-    vector = np.zeros(52)  # 52 cards in a deck
-
-    for card in cards:
-        # Convert rank to string if it's an integer
-        rank = ranks[card.rank -
-                     2] if isinstance(card.rank, int) else card.rank
-
-        # Convert suit to string if it's an integer
-        suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
-
-        rank_index = ranks.index(rank)
-        suit_index = suits.index(suit)
-        card_index = rank_index * 4 + suit_index  # Unique index for each card
-        vector[card_index] = 1  # Set the corresponding position in the vector
-
-    return vector
-
-
-def encode_action(action):
-    """Encodes action as a numerical label."""
-    action_map = {"fold": 0, "call": 1, "raise": 2}
-    return action_map[action]
 
 
 def simulate_texas_holdem(num_players=6, num_games=1000,
@@ -167,11 +146,16 @@ def simulate_texas_holdem(num_players=6, num_games=1000,
         for player in range(num_players):
             bet_to_call = min_bet
             current_pot += bet_to_call
+            
             hand_strength = monte_carlo_hand_strength(
                 player_hole_cards[player], community_cards)
+            if hand_strength == 0.0:
+                raise ValueError("Monte Carlo simulation returned zero hand strength.")
+
             pot_odds = current_pot / (current_pot + bet_to_call)
             action = decide_action(
                 hand_strength, pot_odds, bluffing_probability)
+
             encoded_state = encode_state(
                 player_hole_cards[player],
                 community_cards,
@@ -186,26 +170,48 @@ def simulate_texas_holdem(num_players=6, num_games=1000,
                             "bet_to_call": bet_to_call,
                             "pot_odds": pot_odds})
 
-        for round_cards in [3, 1, 1]:
+        for round_cards in [3, 1, 1]:  # Flop, Turn, River
             if len(deck.cards) < round_cards:
+                # print(f"Not enough cards in deck for {round_cards} community cards.")
                 break
-            community_cards += deck.deal(round_cards)
+
+            dealt_cards = deck.deal(round_cards)
+            if not dealt_cards or len(dealt_cards) != round_cards:
+                raise ValueError(f"Failed to deal {round_cards} cards from the deck.")
+
+            community_cards += dealt_cards
+            # print(f"Dealt {round_cards} cards: {dealt_cards}")
+            # print(f"Updated community cards: {community_cards}")
 
             for player in range(num_players):
+                # Skip folded players
                 if actions[player]["action"] == 0:
+                    # print(f"Player {player} has folded. Skipping...")
                     continue
+                
+                # Simulate a random bet
                 bet_to_call = random.randint(2, 10)
                 current_pot += bet_to_call
-                hand_strength = monte_carlo_hand_strength(
-                    player_hole_cards[player], community_cards)
+
+                # Calculate hand strength
+                hand_strength = monte_carlo_hand_strength(player_hole_cards[player], community_cards)
+                if hand_strength == 0.0:
+                    raise ValueError(f"Hand strength is zero for player {player}. Community Cards: {community_cards}")
+                
+                # Calculate pot odds
                 pot_odds = current_pot / (current_pot + bet_to_call)
-                action = decide_action(
-                    hand_strength, pot_odds, bluffing_probability)
+
+                # Decide action
+                action = decide_action(hand_strength, pot_odds, bluffing_probability)
+                # print(f"Player {player} - Hand Strength: {hand_strength}, Pot Odds: {pot_odds}, Action: {action}")
+                
+                # Encode state and update actions
                 encoded_state = encode_state(
                     player_hole_cards[player],
                     community_cards,
                     hand_strength,
-                    pot_odds)
+                    pot_odds
+                )
                 encoded_action = encode_action(action)
                 actions[player] = {
                     "state": encoded_state,
@@ -214,7 +220,11 @@ def simulate_texas_holdem(num_players=6, num_games=1000,
                     "player_id": player_ids[player],
                     "recent_action": encoded_action,
                     "bet_to_call": bet_to_call,
-                    "pot_odds": pot_odds}
+                    "pot_odds": pot_odds
+                }
+
+                # Debugging output for actions
+                # print(f"Updated action for Player {player}: {actions[player]}")
 
         game_data.append(actions)
 
@@ -237,6 +247,7 @@ def append_simulation_data(file_path, new_data):
     if os.path.exists(file_path):
         # Load existing data from .npz
         with np.load(file_path, allow_pickle=True) as data:
+            logging.info(f"Available keys: {list(data.keys())}")
             # Dynamically fetch the primary dataset key
             primary_key = list(data.keys())[0]  # Assume first key is primary
             existing_data = data[primary_key].tolist()
