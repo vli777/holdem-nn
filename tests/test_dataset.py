@@ -1,5 +1,5 @@
 import pytest
-from src.PokerDataset import PokerDataset
+from PokerDataset import PokerDataset
 
 DATA_PATH = "data/texas_holdem_data.npz"
 

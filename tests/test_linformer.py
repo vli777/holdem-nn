@@ -1,6 +1,6 @@
 import pytest
 import torch
-from src.PokerLinformerModel import PokerLinformerModel
+from models.PokerLinformerModel import PokerLinformerModel
 
 def test_poker_linformer_model_forward():
     batch_size = 8

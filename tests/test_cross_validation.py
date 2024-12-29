@@ -1,8 +1,8 @@
 import pytest
 import torch
 from torch.utils.data import Dataset
-from src.cross_validation import k_fold_cross_validation
-from src.PokerLinformerModel import PokerLinformerModel
+from src.training.cross_validation import k_fold_cross_validation
+from models.PokerLinformerModel import PokerLinformerModel
 
 # Mock Dataset
 class MockDataset(Dataset):
