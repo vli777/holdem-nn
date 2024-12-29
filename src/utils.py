@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """
@@ -71,5 +72,36 @@ def cards_to_vector(cards):
 
     return vector
 
+def validate_dataset(dataset):
+    logging.info("Validating dataset encodings...")
+    invalid_samples = []
 
+    for idx, (state, action_label, position, player_id, recent_action) in enumerate(dataset):
+        try:
+            # Check state dimensions
+            expected_state_dim = 106  # Update if your state dimension changes
+            assert len(state) == expected_state_dim, f"Invalid state dimension at index {idx}: {len(state)}"
 
+            # Check valid action range
+            assert action_label in [0, 1, 2], f"Invalid action label at index {idx}: {action_label}"
+
+            # Check valid position range
+            max_positions = 10  # Update if needed
+            assert 0 <= position < max_positions, f"Invalid position at index {idx}: {position}"
+
+            # Check valid player ID range
+            num_players = 6  # Update if needed
+            assert 0 <= player_id < num_players, f"Invalid player ID at index {idx}: {player_id}"
+
+            # Check valid recent action range
+            assert recent_action in [0, 1, 2], f"Invalid recent action at index {idx}: {recent_action}"
+
+        except AssertionError as e:
+            logging.error(str(e))
+            invalid_samples.append(idx)
+
+    if invalid_samples:
+        logging.error(f"Validation failed for {len(invalid_samples)} samples: {invalid_samples}")
+        raise ValueError(f"Dataset contains invalid encodings. See logs for details.")
+    else:
+        logging.info("Dataset validation passed. All encodings are valid.")
