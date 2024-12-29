@@ -1,7 +1,7 @@
 import logging
-from PokerLinformerModel import PokerLinformerModel
-from PokerPredictor import PokerPredictor
-from PokerEnsemblePredictor import PokerEnsemblePredictor
+from models.PokerLinformerModel import PokerLinformerModel
+from predictors.PokerPredictor import PokerPredictor
+from predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
 from simulate import randomize_sample_action, play_out_game
 import os
 from glob import glob

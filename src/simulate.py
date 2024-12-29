@@ -1,6 +1,6 @@
 import eval7
 import random
-from generate_data import monte_carlo_hand_strength
+from training.generate_data import monte_carlo_hand_strength
 
 
 def randomize_sample_action():

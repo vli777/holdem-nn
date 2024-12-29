@@ -1,6 +1,6 @@
 import torch
 from PokerDataset import PokerDataset
-from PokerModel import PokerModel
+from models.PokerModel import PokerModel
 
 
 class PokerPredictor:
