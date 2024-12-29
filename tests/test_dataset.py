@@ -20,7 +20,7 @@ def test_invalid_actions():
 
 def test_invalid_player_ids():
     dataset = PokerDataset(DATA_PATH)
-    num_players = 6  # Replace with your actual value
+    num_players = 6  
     invalid_player_ids = [
         player_id for _, _, _, player_id, _ in dataset
         if player_id < 0 or player_id >= num_players
@@ -29,7 +29,7 @@ def test_invalid_player_ids():
 
 def test_invalid_positions():
     dataset = PokerDataset(DATA_PATH)
-    max_positions = 10  # Replace with your actual value
+    max_positions = 6  
     invalid_positions = [
         position for _, _, position, _, _ in dataset
         if position < 0 or position >= max_positions
@@ -38,11 +38,14 @@ def test_invalid_positions():
 
 def test_invalid_state_dimensions():
     dataset = PokerDataset(DATA_PATH)
-    expected_state_dim = 54  # Replace with the correct dimension for your state vector
+    expected_state_dim = 106
     invalid_states = [
         state for state, _, _, _, _ in dataset
         if len(state) != expected_state_dim
     ]
+    if invalid_states:
+        for idx, state in enumerate(invalid_states):
+            print(f"Invalid state at index {idx}: {state}, Length: {len(state)}")
     assert not invalid_states, f"Invalid state dimensions found: {invalid_states}"
 
 def test_invalid_recent_actions():

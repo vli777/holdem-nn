@@ -23,6 +23,17 @@ class PokerDataset(Dataset):
             for game in raw_data:
                 for action in game:
                     try:
+                        # Ensure all required keys are present
+                        required_keys = ["state", "action", "position", "player_id", "recent_action"]
+                        for key in required_keys:
+                            if key not in action:
+                                raise KeyError(f"Missing key: {key}")
+                        
+                        # Validate action field
+                        action_label = action["action"]
+                        if action_label not in [0, 1, 2]:
+                            raise ValueError(f"Invalid encoded action: {action_label}")
+                        
                         state = action["state"]
                         action_label = action["action"]
                         position = action["position"]
@@ -31,8 +42,14 @@ class PokerDataset(Dataset):
 
                         precomputed_data.append((state, action_label, position, player_id, recent_action))
                     except KeyError as e:
-                        self.logger.error(f"Missing keys in action: {e}. Skipping...")
-                        continue
+                        self.logger.error(f"Missing keys in action: {e}")
+                        raise  # Raise KeyError immediately
+                    except ValueError as e:
+                        self.logger.error(f"Invalid action value: {e}")
+                        raise
+                    except Exception as e:
+                        self.logger.error(f"Error processing action: {e}")
+                        raise
 
             if len(precomputed_data) == 0:
                 raise ValueError("No valid data points were parsed from the dataset.")
