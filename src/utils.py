@@ -2,6 +2,7 @@ import numpy as np
 import logging
 import eval7
 
+
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """
     Encodes the player's state as a feature vector.
@@ -17,7 +18,7 @@ def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """
     if not hole_cards:
         raise ValueError("Hole cards are empty. This is not valid.")
-    
+
     # Handle empty community cards gracefully (pre-flop)
     community_cards = community_cards or []
 
@@ -26,7 +27,9 @@ def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     community_cards_vector = cards_to_vector(community_cards)
 
     # Concatenate the final state
-    state = np.concatenate([hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]])
+    state = np.concatenate(
+        [hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]]
+    )
     return state
 
 
@@ -60,8 +63,7 @@ def cards_to_vector(cards):
 
     for card in cards:
         # Convert rank to string if it's an integer
-        rank = ranks[card.rank -
-                     2] if isinstance(card.rank, int) else card.rank
+        rank = ranks[card.rank - 2] if isinstance(card.rank, int) else card.rank
 
         # Convert suit to string if it's an integer
         suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
@@ -78,32 +80,50 @@ def validate_dataset(dataset):
     logging.info("Validating dataset encodings...")
     invalid_samples = []
 
-    for idx, (state, action_label, position, player_id, recent_action) in enumerate(dataset):
+    for idx, (state, action_label, position, player_id, recent_action) in enumerate(
+        dataset
+    ):
         try:
             # Check state dimensions
             expected_state_dim = 106  # Update if your state dimension changes
-            assert len(state) == expected_state_dim, f"Invalid state dimension at index {idx}: {len(state)}"
+            assert (
+                len(state) == expected_state_dim
+            ), f"Invalid state dimension at index {idx}: {len(state)}"
 
             # Check valid action range
-            assert action_label in [0, 1, 2], f"Invalid action label at index {idx}: {action_label}"
+            assert action_label in [
+                0,
+                1,
+                2,
+            ], f"Invalid action label at index {idx}: {action_label}"
 
             # Check valid position range
             max_positions = 10  # Update if needed
-            assert 0 <= position < max_positions, f"Invalid position at index {idx}: {position}"
+            assert (
+                0 <= position < max_positions
+            ), f"Invalid position at index {idx}: {position}"
 
             # Check valid player ID range
             num_players = 6  # Update if needed
-            assert 0 <= player_id < num_players, f"Invalid player ID at index {idx}: {player_id}"
+            assert (
+                0 <= player_id < num_players
+            ), f"Invalid player ID at index {idx}: {player_id}"
 
             # Check valid recent action range
-            assert recent_action in [0, 1, 2], f"Invalid recent action at index {idx}: {recent_action}"
+            assert recent_action in [
+                0,
+                1,
+                2,
+            ], f"Invalid recent action at index {idx}: {recent_action}"
 
         except AssertionError as e:
             logging.error(str(e))
             invalid_samples.append(idx)
 
     if invalid_samples:
-        logging.error(f"Validation failed for {len(invalid_samples)} samples: {invalid_samples}")
+        logging.error(
+            f"Validation failed for {len(invalid_samples)} samples: {invalid_samples}"
+        )
         raise ValueError(f"Dataset contains invalid encodings. See logs for details.")
     else:
         logging.info("Dataset validation passed. All encodings are valid.")
@@ -113,7 +133,9 @@ def calculate_pot_odds(current_pot, bet_amount):
     """
     Calculate pot odds given the current pot size and the bet amount.
     """
-    return bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
+    return (
+        bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
+    )
 
 
 # Utility methods for card serialization and deserialization
@@ -137,3 +159,94 @@ def deserialize_cards(cards_serialized):
         list[eval7.Card]: Deserialized eval7.Card objects.
     """
     return [eval7.Card(card) for card in cards_serialized]
+
+
+def calculate_cards_needed(community_cards, include_opponents, remaining_deck_size):
+    """
+    Calculate the number of cards needed based on community cards and opponent modeling.
+    Also logs debugging information and performs validation checks.
+
+    Args:
+        community_cards (list[eval7.Card]): Current community cards.
+        include_opponents (bool): Whether to include opponent modeling.
+        remaining_deck_size (int): Number of cards remaining in the deck.
+
+    Returns:
+        int: Number of cards needed.
+
+    Raises:
+        ValueError: If the number of cards needed exceeds the remaining deck size.
+    """
+    cards_needed = (
+        7 - len(community_cards) if include_opponents else 5 - len(community_cards)
+    )
+    logging.debug(
+        f"Cards needed: {cards_needed}, Community cards: {[str(card) for card in community_cards]}"
+    )
+
+    if remaining_deck_size < cards_needed:
+        logging.error(
+            f"Cannot proceed. Needed: {cards_needed}, Available: {remaining_deck_size}"
+        )
+        raise ValueError(
+            f"Insufficient cards in deck. Needed: {cards_needed}, Available: {remaining_deck_size}"
+        )
+
+    return cards_needed
+
+
+def filter_remaining_deck(deck, excluded_cards):
+    """
+    Filter the remaining deck after excluding specified cards.
+
+    Args:
+        deck (eval7.Deck): The original deck.
+        excluded_cards (set[eval7.Card]): The set of cards to exclude.
+
+    Returns:
+        list[eval7.Card]: The remaining deck after exclusion.
+
+    Raises:
+        AssertionError: If the remaining deck size does not match expectations.
+    """
+    # Convert excluded cards to eval7.Card for consistency
+    excluded_cards = {eval7.Card(str(card)) for card in excluded_cards}
+    logging.debug(f"Excluded Cards: {[str(card) for card in excluded_cards]}")
+    logging.debug(f"Deck Before Exclusion: {[str(card) for card in deck.cards]}")
+
+    # Check if excluded cards are in the deck
+    remaining_excluded = [card for card in excluded_cards if card in deck.cards]
+    if len(remaining_excluded) < len(excluded_cards):
+        logging.warning(f"Some excluded cards were not in the deck: {[str(card) for card in excluded_cards if card not in deck.cards]}")
+
+    # Filter the remaining deck
+    remaining_deck = [card for card in deck.cards if card not in remaining_excluded]
+
+    # Validate deck integrity
+    try:
+        assert len(deck.cards) == len(set(deck.cards)), f"Duplicates in deck: {deck.cards}"
+        assert len(remaining_deck) == len(deck.cards) - len(remaining_excluded), (
+            f"Mismatch: Remaining {len(remaining_deck)}, "
+            f"Expected {len(deck.cards) - len(remaining_excluded)}"
+        )
+    except AssertionError as e:
+        logging.error(f"Assertion failed: {e}")
+        logging.debug(f"Remaining Deck: {[str(card) for card in remaining_deck]}")
+        raise
+
+    return remaining_deck
+
+
+def deepcopy_sample_action(sample_action):
+    """
+    Custom deepcopy utility for sample actions that handles eval7.Card objects.
+    """
+    def copy_cards(cards):
+        # Create new instances of eval7.Card
+        return [eval7.Card(str(card)) for card in cards] if isinstance(cards, list) else cards
+
+    # Recreate the entire structure, ensuring cards are deeply copied
+    return {
+        key: copy_cards(value) if isinstance(value, list) and all(isinstance(card, eval7.Card) for card in value) else value
+        for key, value in sample_action.items()
+    }
