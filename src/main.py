@@ -1,44 +1,53 @@
-import logging
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
 from models.PokerLinformerModel import PokerLinformerModel
-from predictors.PokerPredictor import PokerPredictor
-from predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
-from simulate import randomize_sample_action, play_out_game
-import os
-import sys
-from glob import glob
-from utils import encode_state
+from .predictors.PokerPredictor import PokerPredictor
+from .predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
+from .training.generate_data import monte_carlo_hand_strength
+import eval7
+from pathlib import Path
+import logging
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("uvicorn.error")  # Use Uvicorn's logger
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
+# Initialize FastAPI app
+app = FastAPI()
+logger.info("Starting Poker Predictor API")
 
-# Path to model directory
-MODEL_DIR = "models"
-FULL_MODEL_PATH = os.path.join(MODEL_DIR, "poker_model_full.pth")
+# Add CORS middleware if necessary
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# Directory paths
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_DIR = BASE_DIR / "saved_models"
+FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
+ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pth" for i in range(1, 6)]
 
-def main():
-    # Check for the full model
-    if not os.path.exists(FULL_MODEL_PATH):
-        logging.error(
-            f"Full model not found at {FULL_MODEL_PATH}. Ensure the model is trained and saved.")
-        exit(1)
-
-    # Generate a random sample action
-    sample_action = randomize_sample_action()
-    sample_encoded_state = encode_state(**sample_action)
+# Model parameters    
+input_dim = 106
+hidden_dim = 128
+output_dim = 3
+num_heads = 4
+num_layers = 2
+seq_len = 1
     
-    # Model parameters    
-    input_dim = len(sample_encoded_state)
-    hidden_dim = 128
-    output_dim = 3
-    num_heads = 4
-    num_layers = 2
-    seq_len = 1
-
-    # Initialize the single predictor
-    predictor = PokerPredictor(
+# Initialize predictors
+predictors = {
+    "standard": PokerPredictor(
         model_class=PokerLinformerModel,
         model_path=FULL_MODEL_PATH,
         input_dim=input_dim,
@@ -47,33 +56,10 @@ def main():
         seq_len=seq_len,
         num_heads=num_heads,
         num_layers=num_layers,
-    )
-
-    # Display the initial state
-    logging.info("--- Single Model Prediction ---")
-    predictor.display_hand(sample_action)
-    logging.info(
-        f"Predicted Action: {
-            predictor.predict_action(sample_action)}")
-
-    # Dynamically find fold models
-    fold_model_paths = glob(os.path.join(MODEL_DIR, "*fold*.pth"))
-    if not fold_model_paths:
-        logging.warning(
-            "No fold models found. Proceeding with the full model only.")
-        play_out_game(predictor, sample_action, num_players=6)
-        return
-
-    # Include the full model in the ensemble
-    model_paths = [FULL_MODEL_PATH] + fold_model_paths
-    logging.info(
-        f"Found {
-            len(model_paths)} models for ensemble: {model_paths}")
-
-    # Initialize the ensemble predictor
-    ensemble_predictor = PokerEnsemblePredictor(
+    ),
+    "ensemble": PokerEnsemblePredictor(
         model_class=PokerLinformerModel,
-        model_paths=model_paths,
+        model_paths=ENSEMBLE_MODEL_PATHS,
         input_dim=input_dim,
         hidden_dim=hidden_dim,
         output_dim=output_dim,
@@ -81,23 +67,82 @@ def main():
         num_heads=num_heads,
         num_layers=num_layers,
     )
+}
 
-    # Perform ensemble predictions
-    logging.info("\n--- Ensemble Model Prediction ---")
-    action_with_confidence = ensemble_predictor.predict_with_confidence(
-        sample_action, threshold=0.8)
-    if action_with_confidence == "uncertain":
-        logging.warning("Prediction confidence is too low. Action: uncertain.")
-    else:
-        logging.info(
-            f"Predicted Action with Confidence: {action_with_confidence}")
-    logging.info(
-        f"Predicted Action: {
-            ensemble_predictor.predict_action(sample_action)}")
-    # Simulate and play out the game
-    logging.info("\n--- Simulated Game ---")
-    play_out_game(ensemble_predictor, sample_action, num_players=6)
+# Input data model
+class HandState(BaseModel):
+    hole_cards: List[str] = Field(..., description="Two hole cards in standard poker notation, e.g., ['Ah', 'Kd']")
+    community_cards: List[str] = Field(..., description="Community cards in standard poker notation, e.g., ['Qs', 'Jd']")
+
+# Output response model
+class PredictionResponse(BaseModel):
+    predicted_action: str = Field(..., description="Predicted action: 'fold', 'call', or 'raise'")
+
+def calculate_pot_odds(current_pot, bet_amount):
+    """
+    Calculate pot odds given the current pot size and the bet amount.
+    """
+    return bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
+
+@app.post("/predict", response_model=PredictionResponse)
+def predict_action(
+    hand_state: HandState,
+    predictor_type: Optional[str] = Query("standard", enum=["standard", "ensemble"], description="standard or ensemble (default standard)"),
+    current_pot: Optional[float] = Query(100.0, description="Current pot size (default 100)"),
+    bet_amount: Optional[float] = Query(10.0, description="Current bet amount (default 10)"),
+    num_simulations: Optional[int] = Query(1000, description="Number of simulations for hand strength estimation")
+):
+    """
+    Predict the poker action for a given hand state using either PokerPredictor or PokerEnsemblePredictor.
+    """
+    try:
+        # Input conversion
+        logging.info("Converting input cards to eval7.Card objects...")
+        hole_cards = [eval7.Card(card) for card in hand_state.hole_cards]
+        community_cards = [eval7.Card(card) for card in hand_state.community_cards]
+
+        # Calculate hand strength
+        logging.info("Calculating hand strength...")
+        hand_strength = monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=num_simulations)
+        logging.info(f"Hand strength calculated: {hand_strength}")
+
+        # Calculate pot odds
+        logging.info("Calculating pot odds...")
+        pot_odds = calculate_pot_odds(current_pot, bet_amount)
+        logging.info(f"Pot odds calculated: {pot_odds}")
+
+        # Prepare sample action
+        sample_action = {
+            "hole_cards": hole_cards,
+            "community_cards": community_cards,
+            "hand_strength": hand_strength,
+            "pot_odds": pot_odds,
+        }
+        logging.info(f"Sample action prepared: {sample_action}")
+
+        # Select predictor
+        predictor = predictors.get(predictor_type)
+        if predictor is None:
+            raise HTTPException(status_code=400, detail="Invalid predictor type")
+
+        # Predict action
+        logging.info(f"Using predictor: {predictor_type}")
+        predicted_action = predictor.predict_action(sample_action)
+        logging.info(f"Prediction successful: {predicted_action}")
+        return PredictionResponse(predicted_action=predicted_action)
+
+    except ValueError as ve:
+        logging.error(f"ValueError during prediction: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
+
+    except Exception as e:
+        logging.error(f"Unexpected error during prediction: {e}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during prediction.")
 
 
-if __name__ == "__main__":
-    main()
+@app.get("/")
+def root():
+    """
+    Root endpoint for health check.
+    """
+    return {"message": "Poker Predictor API is running"}

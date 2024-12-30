@@ -4,17 +4,16 @@ from predictors.PokerPredictor import PokerPredictor
 from predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
 from simulate import randomize_sample_action, play_out_game
 import os
-import sys
+from pathlib import Path
 from glob import glob
 from utils import encode_state
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 
 # Path to model directory
-MODEL_DIR = "models"
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_DIR = BASE_DIR / "saved_models"
 FULL_MODEL_PATH = os.path.join(MODEL_DIR, "poker_model_full.pth")
 
 
@@ -52,6 +51,9 @@ def main():
     # Display the initial state
     logging.info("--- Single Model Prediction ---")
     predictor.display_hand(sample_action)
+    
+    # Display prediction
+    logging.info(f"Input to model: {sample_action}")
     logging.info(
         f"Predicted Action: {
             predictor.predict_action(sample_action)}")
