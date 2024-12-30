@@ -38,14 +38,14 @@ MODEL_DIR = BASE_DIR / "saved_models"
 FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
 ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pth" for i in range(1, 6)]
 
-# Model parameters    
+# Model parameters
 input_dim = 106
 hidden_dim = 128
 output_dim = 3
 num_heads = 4
 num_layers = 2
 seq_len = 1
-    
+
 # Initialize predictors
 predictors = {
     "standard": PokerPredictor(
@@ -67,25 +67,45 @@ predictors = {
         seq_len=seq_len,
         num_heads=num_heads,
         num_layers=num_layers,
-    )
+    ),
 }
+
 
 # Input data model
 class HandState(BaseModel):
-    hole_cards: List[str] = Field(..., description="Two hole cards in standard poker notation, e.g., ['Ah', 'Kd']")
-    community_cards: List[str] = Field(..., description="Community cards in standard poker notation, e.g., ['Qs', 'Jd']")
+    hole_cards: List[str] = Field(
+        ..., description="Two hole cards in standard poker notation, e.g., ['Ah', 'Kd']"
+    )
+    community_cards: List[str] = Field(
+        ...,
+        description="Community cards in standard poker notation, e.g., ['Qs', 'Jd']",
+    )
+
 
 # Output response model
 class PredictionResponse(BaseModel):
-    predicted_action: str = Field(..., description="Predicted action: 'fold', 'call', or 'raise'")
+    predicted_action: str = Field(
+        ..., description="Predicted action: 'fold', 'call', or 'raise'"
+    )
+
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_action(
     hand_state: HandState,
-    predictor_type: Optional[str] = Query("standard", enum=["standard", "ensemble"], description="standard or ensemble (default standard)"),
-    current_pot: Optional[float] = Query(100.0, description="Current pot size (default 100)"),
-    bet_amount: Optional[float] = Query(10.0, description="Current bet amount (default 10)"),
-    num_simulations: Optional[int] = Query(1000, description="Number of simulations for hand strength estimation")
+    predictor_type: Optional[str] = Query(
+        "standard",
+        enum=["standard", "ensemble"],
+        description="standard or ensemble (default standard)",
+    ),
+    current_pot: Optional[float] = Query(
+        100.0, description="Current pot size (default 100)"
+    ),
+    bet_amount: Optional[float] = Query(
+        10.0, description="Current bet amount (default 10)"
+    ),
+    num_simulations: Optional[int] = Query(
+        1000, description="Number of simulations for hand strength estimation"
+    ),
 ):
     """
     Predict the poker action for a given hand state using either PokerPredictor or PokerEnsemblePredictor.
@@ -98,7 +118,9 @@ def predict_action(
 
         # Calculate hand strength
         logging.info("Calculating hand strength...")
-        hand_strength = monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=num_simulations)
+        hand_strength = monte_carlo_hand_strength(
+            hole_cards, community_cards, num_simulations=num_simulations
+        )
         logging.info(f"Hand strength calculated: {hand_strength}")
 
         # Calculate pot odds
@@ -132,7 +154,9 @@ def predict_action(
 
     except Exception as e:
         logging.error(f"Unexpected error during prediction: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred during prediction.")
+        raise HTTPException(
+            status_code=500, detail="An unexpected error occurred during prediction."
+        )
 
 
 @app.get("/")

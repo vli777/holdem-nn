@@ -4,8 +4,16 @@ from .PlayerDynamicsAttention import PlayerDynamicsAttention
 
 
 class PokerLinformerModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim,
-                 seq_len, num_heads, num_layers, num_players=6):
+    def __init__(
+        self,
+        input_dim,
+        hidden_dim,
+        output_dim,
+        seq_len,
+        num_heads,
+        num_layers,
+        num_players=6,
+    ):
         super().__init__()
 
         self.input_projection = nn.Linear(input_dim, hidden_dim)
@@ -18,7 +26,7 @@ class PokerLinformerModel(nn.Module):
             dim_feedforward=hidden_dim * 4,
             dropout=0.1,
             activation="gelu",
-            batch_first=True
+            batch_first=True,
         )
         self.transformer_encoder = nn.TransformerEncoder(
             self.encoder_layer, num_layers=1
@@ -30,10 +38,10 @@ class PokerLinformerModel(nn.Module):
             seq_len=seq_len,
             depth=num_layers,
             k=32,
-            heads=num_heads,            
+            heads=num_heads,
             one_kv_head=True,
             share_kv=True,
-            dropout=0.1
+            dropout=0.1,
         )
 
         self.policy_head = nn.Linear(hidden_dim, output_dim)
@@ -43,11 +51,17 @@ class PokerLinformerModel(nn.Module):
         device = x.device
 
         if positions is not None:
-            positions = positions.clamp(0, self.player_dynamics.position_embeddings.num_embeddings - 1).to(device)
+            positions = positions.clamp(
+                0, self.player_dynamics.position_embeddings.num_embeddings - 1
+            ).to(device)
         if player_ids is not None:
-            player_ids = player_ids.clamp(0, self.player_dynamics.player_embeddings.num_embeddings - 1).to(device)
+            player_ids = player_ids.clamp(
+                0, self.player_dynamics.player_embeddings.num_embeddings - 1
+            ).to(device)
         if actions is not None:
-            actions = actions.clamp(0, self.player_dynamics.action_embeddings.num_embeddings - 1).to(device)
+            actions = actions.clamp(
+                0, self.player_dynamics.action_embeddings.num_embeddings - 1
+            ).to(device)
 
         # Input Projection
         x = self.input_projection(x)

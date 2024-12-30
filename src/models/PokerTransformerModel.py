@@ -3,8 +3,9 @@ import torch.nn as nn
 
 
 class PokerTransformerModel(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim,
-                 num_heads, num_layers, max_seq_len=1):
+    def __init__(
+        self, input_dim, hidden_dim, output_dim, num_heads, num_layers, max_seq_len=1
+    ):
         """
         Transformer-based model for predicting poker actions.
         Args:
@@ -25,10 +26,11 @@ class PokerTransformerModel(nn.Module):
             nhead=num_heads,
             dim_feedforward=hidden_dim * 4,
             dropout=0.1,
-            activation='relu'
+            activation="relu",
         )
         self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer, num_layers=num_layers)
+            encoder_layer, num_layers=num_layers
+        )
 
         # Classification head
         self.classifier = nn.Linear(hidden_dim, output_dim)
@@ -66,12 +68,14 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         self.encoding = torch.zeros(max_len, hidden_dim)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, hidden_dim, 2).float(
-        ) * (-torch.log(torch.tensor(10000.0)) / hidden_dim))
+        div_term = torch.exp(
+            torch.arange(0, hidden_dim, 2).float()
+            * (-torch.log(torch.tensor(10000.0)) / hidden_dim)
+        )
         self.encoding[:, 0::2] = torch.sin(position * div_term)
         self.encoding[:, 1::2] = torch.cos(position * div_term)
         self.encoding = self.encoding.unsqueeze(0)  # Add batch dimension
-        self.register_buffer('positional_encoding', self.encoding)
+        self.register_buffer("positional_encoding", self.encoding)
 
     def forward(self, x):
-        return x + self.positional_encoding[:, :x.size(1), :]
+        return x + self.positional_encoding[:, : x.size(1), :]

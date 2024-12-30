@@ -16,13 +16,25 @@ def test_deepcopy_sample_action():
     assert sample_action_for_ensemble == original_sample_action
 
     # Check if the objects are different instances
-    assert all(id(card) != id(original_card)
-               for card, original_card in zip(sample_action_for_ensemble["hole_cards"], original_sample_action["hole_cards"])), "Hole cards were not deep-copied"
-    assert all(id(card) != id(original_card)
-               for card, original_card in zip(sample_action_for_ensemble["community_cards"], original_sample_action["community_cards"])), "Community cards were not deep-copied"
+    assert all(
+        id(card) != id(original_card)
+        for card, original_card in zip(
+            sample_action_for_ensemble["hole_cards"],
+            original_sample_action["hole_cards"],
+        )
+    ), "Hole cards were not deep-copied"
+    assert all(
+        id(card) != id(original_card)
+        for card, original_card in zip(
+            sample_action_for_ensemble["community_cards"],
+            original_sample_action["community_cards"],
+        )
+    ), "Community cards were not deep-copied"
 
     # Debugging outputs
-    print(f"Original Hole Cards IDs: {[id(card) for card in original_sample_action['hole_cards']]}")
-    print(f"Copied Hole Cards IDs: {[id(card) for card in sample_action_for_ensemble['hole_cards']]}")
-
-
+    print(
+        f"Original Hole Cards IDs: {[id(card) for card in original_sample_action['hole_cards']]}"
+    )
+    print(
+        f"Copied Hole Cards IDs: {[id(card) for card in sample_action_for_ensemble['hole_cards']]}"
+    )

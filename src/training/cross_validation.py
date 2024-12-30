@@ -4,6 +4,7 @@ from sklearn.model_selection import StratifiedKFold
 import os
 import logging
 
+
 def run_epoch(loader, model, criterion, device, optimizer=None):
     """
     Runs one epoch for either training or validation.
@@ -34,13 +35,13 @@ def run_epoch(loader, model, criterion, device, optimizer=None):
             player_ids.to(device),
             recent_actions.to(device),
         )
-        
+
         if states.ndim == 2:
             states = states.unsqueeze(1)
 
         # Forward pass
         with torch.set_grad_enabled(is_training):
-            policy_logits, _ = model(states, positions, player_ids, recent_actions)       
+            policy_logits, _ = model(states, positions, player_ids, recent_actions)
             loss = criterion(policy_logits, actions)
             total_loss += loss.item()
 
@@ -55,13 +56,24 @@ def run_epoch(loader, model, criterion, device, optimizer=None):
                 loss.backward()
                 optimizer.step()
 
-    avg_loss = total_loss / len(loader) if len(loader) > 0 else float('inf')
+    avg_loss = total_loss / len(loader) if len(loader) > 0 else float("inf")
     accuracy = correct / total * 100 if total > 0 else 0.0
     return avg_loss, accuracy
 
 
-def k_fold_cross_validation(dataset, device, model_class, model_params, criterion, optimizer_class,
-                            optimizer_params, k=5, epochs=10, batch_size=32, model_save_dir="models"):
+def k_fold_cross_validation(
+    dataset,
+    device,
+    model_class,
+    model_params,
+    criterion,
+    optimizer_class,
+    optimizer_params,
+    k=5,
+    epochs=10,
+    batch_size=32,
+    model_save_dir="models",
+):
     """
     Perform K-Fold Cross-Validation and save model weights for each fold.
     Args:
@@ -86,23 +98,18 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
     patience_limit = 3  # Set a threshold for stopping
 
     for fold, (train_indices, val_indices) in enumerate(
-            # (fold, call, raise)
-            kfold.split(dataset.data, [d[1] for d in dataset.data])):
+        # (fold, call, raise)
+        kfold.split(dataset.data, [d[1] for d in dataset.data])
+    ):
         logging.info(f"Fold {fold + 1}/{k}")
 
         train_subset = Subset(dataset, train_indices)
         val_subset = Subset(dataset, val_indices)
 
-        train_loader = DataLoader(
-            train_subset,
-            batch_size=batch_size,
-            shuffle=True)
+        train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
 
-        val_loader = DataLoader(
-            val_subset,
-            batch_size=batch_size,
-            shuffle=False)        
-        
+        val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+
         model = model_class(**model_params).to(device)
         optimizer = optimizer_class(model.parameters(), **optimizer_params)
 
@@ -112,7 +119,9 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
 
         for epoch in range(epochs):
             # Training loop
-            train_loss, train_accuracy = run_epoch(train_loader, model, criterion, device, optimizer)
+            train_loss, train_accuracy = run_epoch(
+                train_loader, model, criterion, device, optimizer
+            )
 
             # Validation loop
             val_loss, val_accuracy = run_epoch(val_loader, model, criterion, device)
@@ -121,7 +130,10 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
-                torch.save(model.state_dict(), f"{model_save_dir}/best_model_fold{fold + 1}.pth")
+                torch.save(
+                    model.state_dict(),
+                    f"{model_save_dir}/best_model_fold{fold + 1}.pth",
+                )
                 logging.info(f"New best model saved for Fold {fold + 1}")
             else:
                 patience_counter += 1
@@ -137,11 +149,13 @@ def k_fold_cross_validation(dataset, device, model_class, model_params, criterio
             )
 
         # Record fold results
-        fold_results.append({
-            'fold': fold + 1,
-            'train_loss': train_loss,
-            'val_loss': val_loss,
-            'val_accuracy': val_accuracy
-        })
+        fold_results.append(
+            {
+                "fold": fold + 1,
+                "train_loss": train_loss,
+                "val_loss": val_loss,
+                "val_accuracy": val_accuracy,
+            }
+        )
 
     return fold_results

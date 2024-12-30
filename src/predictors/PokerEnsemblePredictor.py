@@ -3,8 +3,15 @@ from utils import encode_state
 
 
 class PokerEnsemblePredictor:
-    def __init__(self, model_class, model_paths, input_dim,
-                 hidden_dim, output_dim, **model_kwargs):
+    def __init__(
+        self,
+        model_class,
+        model_paths,
+        input_dim,
+        hidden_dim,
+        output_dim,
+        **model_kwargs
+    ):
         """
         Initialize the ensemble predictor with multiple model paths.
         Args:
@@ -18,7 +25,11 @@ class PokerEnsemblePredictor:
         self.models = []
         for path in model_paths:
             model = model_class(
-                input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **model_kwargs)
+                input_dim=input_dim,
+                hidden_dim=hidden_dim,
+                output_dim=output_dim,
+                **model_kwargs
+            )
             model.load_state_dict(torch.load(path, weights_only=True))
             model.eval()  # Set to evaluation mode
             self.models.append(model)
@@ -35,8 +46,9 @@ class PokerEnsemblePredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
-            0).unsqueeze(1)  # Add batch dimension
+        input_tensor = (
+            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)
+        )  # Add batch dimension
 
         # Aggregate predictions from all models
         outputs = []
@@ -62,16 +74,16 @@ class PokerEnsemblePredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
-            0).unsqueeze(1)  # Add batch dimension
+        input_tensor = (
+            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)
+        )  # Add batch dimension
 
         # Aggregate predictions
         outputs = []
         for model in self.models:
             with torch.no_grad():
                 outputs.append(model(input_tensor)[0])
-        avg_output = torch.mean(torch.stack(
-            outputs), dim=0)  # Average predictions
+        avg_output = torch.mean(torch.stack(outputs), dim=0)  # Average predictions
 
         # Calculate confidence
         probabilities = torch.softmax(avg_output, dim=1)

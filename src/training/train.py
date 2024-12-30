@@ -8,6 +8,7 @@ from models.PokerLinformerModel import PokerLinformerModel
 from PokerDataset import PokerDataset
 from utils import validate_dataset
 
+
 # Function to load and validate dataset
 def load_dataset(data_path):
     try:
@@ -55,9 +56,7 @@ def train_one_epoch(model, train_loader, optimizer, criterion, scaler, device):
         )
 
         with torch.amp.autocast(device_type="cuda", enabled=device.type == "cuda"):
-            policy_logits, _ = model(
-                states, positions, player_ids, recent_actions
-            )
+            policy_logits, _ = model(states, positions, player_ids, recent_actions)
             loss = criterion(policy_logits, actions)
 
         optimizer.zero_grad()
@@ -88,9 +87,7 @@ def validate(model, val_loader, criterion, device):
                 recent_actions.to(device),
             )
 
-            policy_logits, _ = model(
-                states, positions, player_ids, recent_actions
-            )
+            policy_logits, _ = model(states, positions, player_ids, recent_actions)
             loss = criterion(policy_logits, actions)
             val_loss += loss.item()
 
@@ -118,10 +115,18 @@ def train_and_validate(dataset, device, config):
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
     train_loader = DataLoader(
-        train_dataset, batch_size=config["batch_size"], shuffle=True, pin_memory=True, num_workers=4
+        train_dataset,
+        batch_size=config["batch_size"],
+        shuffle=True,
+        pin_memory=True,
+        num_workers=4,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=config["batch_size"], shuffle=False, pin_memory=True, num_workers=4
+        val_dataset,
+        batch_size=config["batch_size"],
+        shuffle=False,
+        pin_memory=True,
+        num_workers=4,
     )
 
     model, optimizer, scheduler = initialize_model(input_dim, device, config)
@@ -135,7 +140,9 @@ def train_and_validate(dataset, device, config):
 
     for epoch in range(config["num_epochs"]):
         # Training step
-        train_loss = train_one_epoch(model, train_loader, optimizer, criterion, scaler, device)
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, criterion, scaler, device
+        )
 
         # Validation step
         val_loss, accuracy, f1 = validate(model, val_loader, criterion, device)
@@ -194,7 +201,9 @@ def main():
     }
 
     # Paths
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     data_path = os.path.join(base_dir, "data", "texas_holdem_data.npz")
 
     # Device
