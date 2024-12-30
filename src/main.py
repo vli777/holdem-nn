@@ -4,15 +4,18 @@ from predictors.PokerPredictor import PokerPredictor
 from predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
 from simulate import randomize_sample_action, play_out_game
 import os
+import sys
 from glob import glob
-from PokerDataset import PokerDataset
+from utils import encode_state
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 
 # Path to model directory
 MODEL_DIR = "models"
-FULL_MODEL_PATH = os.path.join(MODEL_DIR, "poker_model.pth")
+FULL_MODEL_PATH = os.path.join(MODEL_DIR, "poker_model_full.pth")
 
 
 def main():
@@ -22,8 +25,11 @@ def main():
             f"Full model not found at {FULL_MODEL_PATH}. Ensure the model is trained and saved.")
         exit(1)
 
-    # Model parameters
-    sample_encoded_state = PokerDataset.encode_state(randomize_sample_action())
+    # Generate a random sample action
+    sample_action = randomize_sample_action()
+    sample_encoded_state = encode_state(**sample_action)
+    
+    # Model parameters    
     input_dim = len(sample_encoded_state)
     hidden_dim = 128
     output_dim = 3
@@ -42,9 +48,6 @@ def main():
         num_heads=num_heads,
         num_layers=num_layers,
     )
-
-    # Randomize a sample action
-    sample_action = randomize_sample_action()
 
     # Display the initial state
     logging.info("--- Single Model Prediction ---")
@@ -88,7 +91,9 @@ def main():
     else:
         logging.info(
             f"Predicted Action with Confidence: {action_with_confidence}")
-
+    logging.info(
+        f"Predicted Action: {
+            ensemble_predictor.predict_action(sample_action)}")
     # Simulate and play out the game
     logging.info("\n--- Simulated Game ---")
     play_out_game(ensemble_predictor, sample_action, num_players=6)

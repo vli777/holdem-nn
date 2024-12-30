@@ -1,6 +1,5 @@
 import torch
-from PokerDataset import PokerDataset
-from models.PokerModel import PokerModel
+from src.utils import encode_state
 
 
 class PokerPredictor:
@@ -28,24 +27,24 @@ class PokerPredictor:
         Predict the action for a given poker hand state.
         Args:
             sample_action (dict): A dictionary containing the hand state:
-                                  - "hole_cards": List[eval7.Card]
-                                  - "community_cards": List[eval7.Card]
-                                  - "hand_strength": float
-                                  - "pot_odds": float
+                                - "hole_cards": List[eval7.Card]
+                                - "community_cards": List[eval7.Card]
+                                - "hand_strength": float
+                                - "pot_odds": float
         Returns:
             str: Predicted action ("fold", "call", or "raise").
         """
         # Encode the state
-        encoded_state = PokerDataset.encode_state(sample_action)
-        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
-            0)  # Add batch dimension
+        encoded_state = encode_state(**sample_action)
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)  # Add batch and seq length dimensions
 
         # Predict
-        output = self.model(input_tensor)
-        predicted_action = torch.argmax(output, dim=1).item()
+        policy_logits, _ = self.model(input_tensor)
+        predicted_action = torch.argmax(policy_logits, dim=1).item()
 
         # Map prediction to action name
         return self.action_map[predicted_action]
+
 
     def display_hand(self, sample_action):
         """

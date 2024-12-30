@@ -1,5 +1,6 @@
 import torch
 from PokerDataset import PokerDataset
+from utils import encode_state
 
 
 class PokerEnsemblePredictor:
@@ -34,15 +35,15 @@ class PokerEnsemblePredictor:
             str: Predicted action ("fold", "call", or "raise").
         """
         # Encode the state
-        encoded_state = PokerDataset.encode_state(sample_action)
+        encoded_state = encode_state(**sample_action)
         input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
-            0)  # Add batch dimension
+            0).unsqueeze(1)  # Add batch dimension
 
         # Aggregate predictions from all models
         outputs = []
         for model in self.models:
             with torch.no_grad():
-                outputs.append(model(input_tensor))
+                outputs.append(model(input_tensor)[0])
 
         # Average the outputs across the ensemble
         avg_output = torch.mean(torch.stack(outputs), dim=0)
@@ -61,15 +62,15 @@ class PokerEnsemblePredictor:
             str: Predicted action ("fold", "call", "raise") or "uncertain".
         """
         # Encode the state
-        encoded_state = PokerDataset.encode_state(sample_action)
+        encoded_state = encode_state(**sample_action)
         input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(
-            0)  # Add batch dimension
+            0).unsqueeze(1)  # Add batch dimension
 
         # Aggregate predictions
         outputs = []
         for model in self.models:
             with torch.no_grad():
-                outputs.append(model(input_tensor))
+                outputs.append(model(input_tensor)[0])
         avg_output = torch.mean(torch.stack(
             outputs), dim=0)  # Average predictions
 
