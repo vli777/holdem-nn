@@ -9,7 +9,7 @@ This project uses generated data instead of actual game play data for training. 
 100 - 200k: practical use
 500k - 1m: production optimal
 
-For the model, I utilized the Linformer model [ arXiv:2006.04768v3](https://arxiv.org/abs/2006.04768) for the transformer model and encoded several features for the card states of multiple players and their actions. 
+For the model, I utilized the Linformer model [ arXiv:2006.04768v3](https://arxiv.org/abs/2006.04768) for the transformer model and encoded several features for the card states of multiple players and their actions. There are still many features that can be considered i.e. game context, player tendencies, temporal dynamics including players dropping out later in the game, opponent modeling.
 
 Ideally after training the baseline model with transformers, if this approach can approximate SOTA performance, we can update the model with reinforcement learning to cover the remainder of the explorer space with faster convergence.* 
 
