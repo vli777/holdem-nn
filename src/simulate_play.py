@@ -1,35 +1,4 @@
 import eval7
-import random
-from training.generate_data import monte_carlo_hand_strength
-
-
-def randomize_sample_action():
-    """
-    Generate a random poker hand state.
-    Returns:
-        dict: Randomized sample action with hole cards, community cards, hand strength, and pot odds.
-    """
-    deck = eval7.Deck()
-    deck.shuffle()
-
-    # Deal random hole cards for the player
-    hole_cards = deck.deal(2)
-
-    # Deal a random number of community cards (0 to 5)
-    community_cards = deck.deal(random.randint(0, 5))
-
-    hand_strength = monte_carlo_hand_strength(hole_cards, community_cards)
-
-    # Random pot odds (example range: 0.1 to 0.9)
-    pot_odds = random.uniform(0.1, 0.9)
-
-    return {
-        "hole_cards": hole_cards,
-        "community_cards": community_cards,
-        "hand_strength": hand_strength,
-        "pot_odds": pot_odds
-    }
-
 
 def play_out_game(predictor, sample_action, num_players=6):
     """

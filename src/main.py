@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 from models.PokerLinformerModel import PokerLinformerModel
+from utils import calculate_pot_odds
 from .predictors.PokerPredictor import PokerPredictor
 from .predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
 from .training.generate_data import monte_carlo_hand_strength
@@ -77,12 +78,6 @@ class HandState(BaseModel):
 # Output response model
 class PredictionResponse(BaseModel):
     predicted_action: str = Field(..., description="Predicted action: 'fold', 'call', or 'raise'")
-
-def calculate_pot_odds(current_pot, bet_amount):
-    """
-    Calculate pot odds given the current pot size and the bet amount.
-    """
-    return bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_action(

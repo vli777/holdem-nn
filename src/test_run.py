@@ -1,8 +1,9 @@
 import logging
+from mc import randomize_sample_action
 from models.PokerLinformerModel import PokerLinformerModel
 from predictors.PokerPredictor import PokerPredictor
 from predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
-from simulate import randomize_sample_action, play_out_game
+from simulate_play import play_out_game
 import os
 from pathlib import Path
 from glob import glob
