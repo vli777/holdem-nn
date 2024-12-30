@@ -20,4 +20,6 @@ Instructions
 3. Run train.py
 4. Test out a sample hand by running main.py
 
+![image](https://github.com/user-attachments/assets/e7fc55c8-6c9e-422f-90f0-e4d06badd9a9)
+
 
