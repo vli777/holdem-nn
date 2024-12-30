@@ -6,7 +6,7 @@ import numpy as np
 import os
 import time
 from multiprocessing import Pool
-from src.utils import encode_state, encode_action
+from utils import encode_state, encode_action
 
 
 def evaluate_hand(hole_cards, community_cards):
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     start_time = time.time()
     with Pool() as pool:
         game_data = simulate_texas_holdem(
-            num_games=10,
+            num_games=100,
             bluffing_strategy=lambda: random.uniform(
                 0.2,
                 1))

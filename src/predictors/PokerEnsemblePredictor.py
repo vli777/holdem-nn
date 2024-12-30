@@ -1,5 +1,4 @@
 import torch
-from PokerDataset import PokerDataset
 from utils import encode_state
 
 

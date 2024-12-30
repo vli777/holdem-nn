@@ -1,5 +1,5 @@
 import torch
-from src.utils import encode_state
+from utils import encode_state
 
 
 class PokerPredictor:
