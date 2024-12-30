@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import eval7
 
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """
@@ -72,6 +73,7 @@ def cards_to_vector(cards):
 
     return vector
 
+
 def validate_dataset(dataset):
     logging.info("Validating dataset encodings...")
     invalid_samples = []
@@ -105,3 +107,33 @@ def validate_dataset(dataset):
         raise ValueError(f"Dataset contains invalid encodings. See logs for details.")
     else:
         logging.info("Dataset validation passed. All encodings are valid.")
+
+
+def calculate_pot_odds(current_pot, bet_amount):
+    """
+    Calculate pot odds given the current pot size and the bet amount.
+    """
+    return bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
+
+
+# Utility methods for card serialization and deserialization
+def serialize_cards(cards):
+    """
+    Serialize a list of eval7.Card objects into strings.
+    Args:
+        cards (list[eval7.Card]): The cards to serialize.
+    Returns:
+        list[str]: Serialized card strings.
+    """
+    return [str(card) for card in cards]
+
+
+def deserialize_cards(cards_serialized):
+    """
+    Deserialize a list of strings into eval7.Card objects.
+    Args:
+        cards_serialized (list[str]): The serialized card strings.
+    Returns:
+        list[eval7.Card]: Deserialized eval7.Card objects.
+    """
+    return [eval7.Card(card) for card in cards_serialized]
