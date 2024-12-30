@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from PokerDataset import PokerDataset
-from src.utils import encode_action  # Updated import
+from utils import encode_action  
 
 def test_dataset_loading():
     dataset = PokerDataset("data/texas_holdem_data.npz")

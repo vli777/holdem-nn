@@ -1,7 +1,7 @@
 import pytest
 import torch
 from torch.utils.data import Dataset
-from src.training.cross_validation import k_fold_cross_validation
+from training.cross_validation import k_fold_cross_validation
 from models.PokerLinformerModel import PokerLinformerModel
 
 # Mock Dataset
@@ -29,7 +29,10 @@ class MockDataset(Dataset):
 class MockModel(PokerLinformerModel):
     def forward(self, states, positions, player_ids, recent_actions):
         batch_size = states.size(0)
-        return torch.rand(batch_size, 3), torch.rand(batch_size, 1)  # Policy logits, value
+        policy_logits = torch.rand(batch_size, 3, requires_grad=True)  # Policy logits
+        value = torch.rand(batch_size, 1, requires_grad=True)          # Value
+        return policy_logits, value
+    
 
 @pytest.fixture
 def setup_mock_data():
@@ -87,7 +90,7 @@ def test_k_fold_cross_validation_empty_dataset(tmp_path):
     model_save_dir = tmp_path / "models"
     model_save_dir.mkdir()
 
-    with pytest.raises(ValueError, match="Cannot have number of splits .* greater than the number of samples .*"):
+    with pytest.raises(ValueError, match=r"Found array with 0 sample\(s\) .* while a minimum of 1 is required\."):
         k_fold_cross_validation(
             dataset=dataset,
             device=torch.device("cpu"),
@@ -102,6 +105,7 @@ def test_k_fold_cross_validation_empty_dataset(tmp_path):
             model_save_dir=str(model_save_dir)
         )
 
+     
 def test_k_fold_cross_validation_early_stopping(setup_mock_data, tmp_path):
     dataset, model_params = setup_mock_data
     model_save_dir = tmp_path / "models"
