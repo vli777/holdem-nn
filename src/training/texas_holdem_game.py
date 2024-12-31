@@ -271,7 +271,7 @@ class TexasHoldemGame:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    game = TexasHoldemGame(num_players=6, bluffing_probability=0.2)
+    game = TexasHoldemGame(num_players=6)
     game.play_hand()
 
     final_data = game.get_game_data()
