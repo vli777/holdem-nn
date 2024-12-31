@@ -1,6 +1,7 @@
 import random
 import torch
 import logging
+from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, random_split, Subset
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
@@ -82,6 +83,9 @@ def train_one_epoch(model, train_loader, optimizer, criterion, scaler, device):
 
         optimizer.zero_grad()
         scaler.scale(loss).backward()
+
+        clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         scaler.step(optimizer)
         scaler.update()
         running_loss += loss.item()
@@ -122,7 +126,7 @@ def validate(model, val_loader, criterion, device):
 
     val_loss /= max(len(val_loader), 1)
     accuracy = correct / total * 100 if total > 0 else 0
-    f1 = f1_score(true_labels, predicted_labels, average="macro")
+    f1 = f1_score(true_labels, predicted_labels, average="weighted")
 
     return val_loss, accuracy, f1
 
@@ -149,6 +153,14 @@ def train(dataset, device, config):
         num_workers=4,
     )
 
+    # for states, actions, positions, player_ids, recent_actions in train_loader:
+    #     print("States:", states.mean().item(), states.std().item())
+    #     print("Actions:", actions.unique())
+    #     print("Positions:", positions.unique())
+    #     print("Player IDs:", player_ids.unique())
+    #     print("Recent Actions:", recent_actions.unique())
+    #     break
+    # exit()
     model, optimizer, scheduler = initialize_model(input_dim, device, config)
     criterion = torch.nn.CrossEntropyLoss()
     scaler = torch.amp.GradScaler(device="cuda")
@@ -225,7 +237,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Using device: {device}")
 
-    dataset = load_dataset(data_path, max_samples=10000, shuffle_subset=True)
+    dataset = load_dataset(data_path, max_samples=1000, shuffle_subset=True)
 
     train(dataset, device, model_hyperparameters)
 

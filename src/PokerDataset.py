@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from torch.nn.functional import normalize
 import logging
 from pathlib import Path
 from config import config
@@ -88,9 +89,11 @@ class PokerDataset(Dataset):
                 f"Index {idx} out of range for dataset of size {len(self.data)}"
             )
         state, action_label, position, player_id, recent_action = self.data[idx]
+        state = torch.tensor(state, dtype=torch.float32)
+        state = normalize(state, p=2, dim=0)
 
         return (
-            torch.tensor(state, dtype=torch.float32),
+            state,
             torch.tensor(action_label, dtype=torch.long),
             torch.tensor(position, dtype=torch.long),
             torch.tensor(player_id, dtype=torch.long),
