@@ -18,10 +18,7 @@ def run_epoch(loader, model, criterion, device, optimizer=None):
         Tuple of (average_loss, total_correct, total_samples)
     """
     is_training = optimizer is not None
-    if is_training:
-        model.train()
-    else:
-        model.eval()
+    model.train() if is_training else model.eval()
 
     total_loss = 0.0
     correct = 0
@@ -99,7 +96,7 @@ def k_fold_cross_validation(
 
     for fold, (train_indices, val_indices) in enumerate(
         # (fold, call, raise)
-        kfold.split(dataset.data, [d[1] for d in dataset.data])
+        kfold.split(dataset.data, dataset.labels) 
     ):
         logging.info(f"Fold {fold + 1}/{k}")
 
@@ -107,7 +104,6 @@ def k_fold_cross_validation(
         val_subset = Subset(dataset, val_indices)
 
         train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-
         val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
         model = model_class(**model_params).to(device)
