@@ -2,15 +2,15 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
+from treys import Evaluator, Card
 from models.PokerLinformerModel import PokerLinformerModel
 from utils import calculate_pot_odds
 from .predictors.PokerPredictor import PokerPredictor
 from .predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
-from .training.generate_data import monte_carlo_hand_strength
-import eval7
 from pathlib import Path
 import logging
+
+evaluator = Evaluator()
 
 # Set up logging
 logging.basicConfig(
@@ -39,7 +39,7 @@ FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
 ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pth" for i in range(1, 6)]
 
 # Model parameters
-input_dim = 106
+input_dim = 2
 hidden_dim = 128
 output_dim = 3
 num_heads = 4
@@ -103,24 +103,19 @@ def predict_action(
     bet_amount: Optional[float] = Query(
         10.0, description="Current bet amount (default 10)"
     ),
-    num_simulations: Optional[int] = Query(
-        1000, description="Number of simulations for hand strength estimation"
-    ),
 ):
     """
     Predict the poker action for a given hand state using either PokerPredictor or PokerEnsemblePredictor.
     """
     try:
-        # Input conversion
-        logging.info("Converting input cards to eval7.Card objects...")
-        hole_cards = [eval7.Card(card) for card in hand_state.hole_cards]
-        community_cards = [eval7.Card(card) for card in hand_state.community_cards]
+        # Convert input cards to Treys format
+        logging.info("Converting input cards to Treys format...")
+        hole_cards = [Card.new(card) for card in hand_state.hole_cards]
+        community_cards = [Card.new(card) for card in hand_state.community_cards]
 
-        # Calculate hand strength
-        logging.info("Calculating hand strength...")
-        hand_strength = monte_carlo_hand_strength(
-            hole_cards, community_cards, num_simulations=num_simulations
-        )
+        # Calculate hand strength using Treys Evaluator
+        logging.info("Calculating hand strength using Treys...")
+        hand_strength = evaluator.evaluate(hole_cards, community_cards)
         logging.info(f"Hand strength calculated: {hand_strength}")
 
         # Calculate pot odds
@@ -157,8 +152,7 @@ def predict_action(
         raise HTTPException(
             status_code=500, detail="An unexpected error occurred during prediction."
         )
-
-
+        
 @app.get("/")
 def root():
     """
