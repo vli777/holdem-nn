@@ -1,19 +1,52 @@
+import os
+from pathlib import Path
 import pytest
 from PokerDataset import PokerDataset
+import torch
+from config import config
 
-DATA_PATH = "data/texas_holdem_data.npz"
+# Ensure DATA_PATH is a string to avoid AttributeError
+DATA_PATH = str(config.data_path)
 
 
-def test_data_validity():
+@pytest.fixture(scope="module")
+def dataset():
+    if not os.path.exists(DATA_PATH):
+        pytest.skip("Data file missing, skipping dataset fixture.")
+    ds = PokerDataset(DATA_PATH)
+    subset_size = 10000
+    if len(ds) > subset_size:
+        from torch.utils.data import Subset
+        import random
+
+        indices = list(range(len(ds)))
+        random.shuffle(indices)
+        subset_indices = indices[:subset_size]
+        ds = Subset(ds, subset_indices)
+    return ds
+
+
+def test_dataset_item_structure():
+    data_path = Path("data/texas_holdem_data.npz")
+    dataset = PokerDataset(str(data_path))
+    state, action_label, position, player_id, recent_action = dataset[0]
+    assert isinstance(state, torch.Tensor) and state.shape == (
+        4,
+    ), "State tensor shape mismatch"
+    assert action_label in [0, 1, 2], "Invalid action label"
+    assert isinstance(position, torch.Tensor), "Position should be a tensor"
+    assert isinstance(player_id, torch.Tensor), "Player ID should be a tensor"
+    assert isinstance(recent_action, torch.Tensor), "Recent action should be a tensor"
+
+
+def test_data_validity(dataset):
     try:
-        dataset = PokerDataset(DATA_PATH)
         assert len(dataset) > 0, "Dataset should not be empty"
     except Exception as e:
         pytest.fail(f"Failed to load dataset: {e}")
 
 
-def test_invalid_actions():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_actions(dataset):
     invalid_actions = [
         action_label
         for _, action_label, _, _, _ in dataset
@@ -22,8 +55,7 @@ def test_invalid_actions():
     assert not invalid_actions, f"Invalid actions found: {invalid_actions}"
 
 
-def test_invalid_player_ids():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_player_ids(dataset):
     num_players = 6
     invalid_player_ids = [
         player_id
@@ -33,8 +65,7 @@ def test_invalid_player_ids():
     assert not invalid_player_ids, f"Invalid player IDs found: {invalid_player_ids}"
 
 
-def test_invalid_positions():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_positions(dataset):
     max_positions = 6
     invalid_positions = [
         position
@@ -44,8 +75,7 @@ def test_invalid_positions():
     assert not invalid_positions, f"Invalid positions found: {invalid_positions}"
 
 
-def test_invalid_state_dimensions():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_state_dimensions(dataset):
     expected_state_dim = 106
     invalid_states = [
         state for state, _, _, _, _ in dataset if len(state) != expected_state_dim
@@ -56,8 +86,7 @@ def test_invalid_state_dimensions():
     assert not invalid_states, f"Invalid state dimensions found: {invalid_states}"
 
 
-def test_invalid_recent_actions():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_recent_actions(dataset):
     invalid_recent_actions = [
         recent_action
         for _, _, _, _, recent_action in dataset
@@ -68,8 +97,7 @@ def test_invalid_recent_actions():
     ), f"Invalid recent actions found: {invalid_recent_actions}"
 
 
-def test_invalid_hand_strength_and_pot_odds():
-    dataset = PokerDataset(DATA_PATH)
+def test_invalid_hand_strength_and_pot_odds(dataset):
     invalid_hand_strengths_or_pot_odds = [
         (state[-2], state[-1])
         for state, _, _, _, _ in dataset

@@ -47,8 +47,11 @@ num_layers = 2
 seq_len = 1
 
 # Initialize predictors
-predictors = {
-    "standard": PokerPredictor(
+predictors = {}
+
+# Initialize PokerPredictor
+if FULL_MODEL_PATH.exists():
+    predictors["standard"] = PokerPredictor(
         model_class=PokerLinformerModel,
         model_path=FULL_MODEL_PATH,
         input_dim=input_dim,
@@ -57,8 +60,22 @@ predictors = {
         seq_len=seq_len,
         num_heads=num_heads,
         num_layers=num_layers,
-    ),
-    "ensemble": PokerEnsemblePredictor(
+    )
+    logger.info("Standard PokerPredictor initialized.")
+else:
+    logger.error(f"Standard model file not found at {FULL_MODEL_PATH}.")
+    predictors["standard"] = None  # Or set to a dummy predictor
+
+# Initialize PokerEnsemblePredictor
+ensemble_models_loaded = True
+for path in ENSEMBLE_MODEL_PATHS:
+    if not path.exists():
+        logger.error(f"Ensemble model file not found at {path}.")
+        ensemble_models_loaded = False
+        break
+
+if ensemble_models_loaded:
+    predictors["ensemble"] = PokerEnsemblePredictor(
         model_class=PokerLinformerModel,
         model_paths=ENSEMBLE_MODEL_PATHS,
         input_dim=input_dim,
@@ -67,8 +84,11 @@ predictors = {
         seq_len=seq_len,
         num_heads=num_heads,
         num_layers=num_layers,
-    ),
-}
+    )
+    logger.info("Ensemble PokerPredictor initialized.")
+else:
+    logger.error("Ensemble model files not found. Ensemble predictor not initialized.")
+    predictors["ensemble"] = None  # Or set to a dummy predictor
 
 
 # Input data model
@@ -108,6 +128,14 @@ def predict_action(
     Predict the poker action for a given hand state using either PokerPredictor or PokerEnsemblePredictor.
     """
     try:
+        predictor = predictors.get(predictor_type)
+        if predictor is None:
+            logger.error(f"Predictor type '{predictor_type}' is not available.")
+            raise HTTPException(
+                status_code=503,
+                detail="Predictor not available due to missing model files.",
+            )
+
         # Convert input cards to Treys format
         logging.info("Converting input cards to Treys format...")
         hole_cards = [Card.new(card) for card in hand_state.hole_cards]
@@ -132,11 +160,6 @@ def predict_action(
             "pot_odds": pot_odds,
         }
         logging.info(f"Sample action prepared: {sample_action}")
-
-        # Select predictor
-        predictor = predictors.get(predictor_type)
-        if predictor is None:
-            raise HTTPException(status_code=400, detail="Invalid predictor type")
 
         # Predict action
         logging.info(f"Using predictor: {predictor_type}")

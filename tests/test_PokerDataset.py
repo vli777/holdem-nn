@@ -21,7 +21,7 @@ def test_valid_dataset():
     valid_data = [
         [
             {
-                "state": np.random.rand(106),
+                "state": np.random.rand(2),
                 "action": 1,  # Valid action (0, 1, or 2)
                 "position": 3,
                 "player_id": 2,
@@ -57,7 +57,7 @@ def test_invalid_dataset():
     invalid_data = [
         [
             {
-                "state": np.random.rand(106),
+                "state": np.random.rand(2),
                 "action": 5,  # Invalid action
                 "position": 3,
                 "player_id": 2,
@@ -77,7 +77,7 @@ def test_missing_field_in_action():
     missing_field_data = [
         [
             {
-                "state": np.random.rand(106),
+                "state": np.random.rand(2),
                 # Missing "action" field
                 "position": 3,
                 "player_id": 2,
