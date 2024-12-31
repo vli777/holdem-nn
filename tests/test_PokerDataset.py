@@ -5,10 +5,10 @@ import numpy as np
 import torch
 from pathlib import Path
 from torch.utils.data import Subset
-from config import config 
+from config import config
 from PokerDataset import PokerDataset
 from utils import encode_action
-import random  
+import random
 
 
 @pytest.fixture
@@ -34,16 +34,21 @@ def test_dataset_loading(tmp_path):
     assert len(dataset) > 0, "Dataset should not be empty"
 
 
-@pytest.mark.parametrize("action,expected", [
-    ("fold", 0),
-    ("call", 1),
-    ("raise", 2),
-])
+@pytest.mark.parametrize(
+    "action,expected",
+    [
+        ("fold", 0),
+        ("call", 1),
+        ("raise", 2),
+    ],
+)
 def test_encode_action_valid(action, expected):
     """
     Test that encode_action correctly encodes valid actions.
     """
-    assert encode_action(action) == expected, f"encode_action('{action}') should return {expected}"
+    assert (
+        encode_action(action) == expected
+    ), f"encode_action('{action}') should return {expected}"
 
 
 @pytest.mark.parametrize("action", ["invalid_action", "check", "bet"])
@@ -93,11 +98,13 @@ def test_valid_dataset(tmp_path):
         )
 
         # Assert action_label
-        assert isinstance(action_label, torch.Tensor), "Action label should be a torch.Tensor"
+        assert isinstance(
+            action_label, torch.Tensor
+        ), "Action label should be a torch.Tensor"
         assert action_label.dim() == 0, "Action label tensor should be scalar"
-        assert action_label.item() in range(config.output_dim), (
-            f"Invalid action label at index {idx}: {action_label.item()}"
-        )
+        assert action_label.item() in range(
+            config.output_dim
+        ), f"Invalid action label at index {idx}: {action_label.item()}"
 
         # Assert position
         assert isinstance(position, torch.Tensor), "Position should be a torch.Tensor"
@@ -108,7 +115,9 @@ def test_valid_dataset(tmp_path):
         assert player_id.dim() == 0, "Player ID tensor should be scalar"
 
         # Assert recent_action
-        assert isinstance(recent_action, torch.Tensor), "Recent action should be a torch.Tensor"
+        assert isinstance(
+            recent_action, torch.Tensor
+        ), "Recent action should be a torch.Tensor"
         assert recent_action.dim() == 0, "Recent action tensor should be scalar"
 
 
@@ -132,7 +141,9 @@ def test_invalid_dataset_all_invalid(tmp_path):
     np.savez_compressed(invalid_dataset_path, updated_data=invalid_data)
 
     # Attempt to load the invalid dataset and expect a ValueError
-    with pytest.raises(ValueError, match="No valid data points were parsed from the dataset."):
+    with pytest.raises(
+        ValueError, match="No valid data points were parsed from the dataset."
+    ):
         PokerDataset(str(invalid_dataset_path))
 
 
@@ -159,7 +170,7 @@ def test_invalid_dataset_partial(tmp_path):
             "recent_action": 1,
             "bet_to_call": 10,
             "pot_odds": 0.5,
-        }
+        },
     ]
     mixed_dataset_path = tmp_path / "invalid_dataset_partial.npz"
     np.savez_compressed(mixed_dataset_path, updated_data=mixed_data)
@@ -190,12 +201,12 @@ def test_missing_field_in_action(tmp_path):
         }
     ]
     missing_field_dataset_path = tmp_path / "missing_field_dataset.npz"
-    np.savez_compressed(
-        missing_field_dataset_path, updated_data=missing_field_data
-    )
+    np.savez_compressed(missing_field_dataset_path, updated_data=missing_field_data)
 
     # Attempt to load the dataset and expect a ValueError since no valid data points are parsed
-    with pytest.raises(ValueError, match="No valid data points were parsed from the dataset."):
+    with pytest.raises(
+        ValueError, match="No valid data points were parsed from the dataset."
+    ):
         PokerDataset(str(missing_field_dataset_path))
 
 
@@ -249,7 +260,9 @@ def test_invalid_recent_actions(dataset):
         for _, _, _, _, recent_action in dataset
         if recent_action.item() not in valid_recent_actions
     ]
-    assert not invalid_recent_actions, f"Invalid recent actions found: {invalid_recent_actions}"
+    assert (
+        not invalid_recent_actions
+    ), f"Invalid recent actions found: {invalid_recent_actions}"
 
 
 def test_invalid_hand_strength_and_pot_odds(dataset):
@@ -262,4 +275,6 @@ def test_invalid_hand_strength_and_pot_odds(dataset):
         for state, _, _, _, _ in dataset
         if not (0 <= state[-2].item() <= 1) or not (0 <= state[-1].item() <= 1)
     ]
-    assert not invalid_hand_strengths_or_pot_odds, f"Invalid hand strengths or pot odds found: {invalid_hand_strengths_or_pot_odds}"
+    assert (
+        not invalid_hand_strengths_or_pot_odds
+    ), f"Invalid hand strengths or pot odds found: {invalid_hand_strengths_or_pot_odds}"

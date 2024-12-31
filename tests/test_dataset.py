@@ -2,9 +2,9 @@ import pytest
 import torch
 from torch.utils.data import Subset
 from pathlib import Path
-from config import config  
+from config import config
 from PokerDataset import PokerDataset
-import random  
+import random
 
 # Convert DATA_PATH to string to avoid AttributeError
 DATA_PATH = str(config.data_path)
@@ -27,26 +27,34 @@ def dataset():
 def test_dataset_item_structure():
     dataset = PokerDataset(DATA_PATH)
     state, action_label, position, player_id, recent_action = dataset[0]
-    
+
     # Test state
     assert isinstance(state, torch.Tensor), "State should be a torch.Tensor"
-    assert state.shape == (config.input_dim,), f"State tensor shape mismatch: expected {config.input_dim}, got {state.shape}"
-    
+    assert state.shape == (
+        config.input_dim,
+    ), f"State tensor shape mismatch: expected {config.input_dim}, got {state.shape}"
+
     # Test action_label
-    assert isinstance(action_label, torch.Tensor), "Action label should be a torch.Tensor"
+    assert isinstance(
+        action_label, torch.Tensor
+    ), "Action label should be a torch.Tensor"
     assert action_label.dim() == 0, "Action label tensor should be scalar"
-    assert action_label.item() in range(config.output_dim), f"Invalid action label: {action_label.item()}"
-    
+    assert action_label.item() in range(
+        config.output_dim
+    ), f"Invalid action label: {action_label.item()}"
+
     # Test position
     assert isinstance(position, torch.Tensor), "Position should be a torch.Tensor"
     assert position.dim() == 0, "Position tensor should be scalar"
-    
+
     # Test player_id
     assert isinstance(player_id, torch.Tensor), "Player ID should be a torch.Tensor"
     assert player_id.dim() == 0, "Player ID tensor should be scalar"
-    
+
     # Test recent_action
-    assert isinstance(recent_action, torch.Tensor), "Recent action should be a torch.Tensor"
+    assert isinstance(
+        recent_action, torch.Tensor
+    ), "Recent action should be a torch.Tensor"
     assert recent_action.dim() == 0, "Recent action tensor should be scalar"
 
 
@@ -86,14 +94,16 @@ def test_invalid_positions(dataset):
 def test_invalid_state_dimensions(dataset):
     expected_state_dim = config.input_dim  # Should be 4 as per config
     invalid_states = [
-        state
-        for state, _, _, _, _ in dataset
-        if len(state) != expected_state_dim
+        state for state, _, _, _, _ in dataset if len(state) != expected_state_dim
     ]
     if invalid_states:
-        for idx, state in enumerate(invalid_states[:10]):  # Limit to first 10 for brevity
+        for idx, state in enumerate(
+            invalid_states[:10]
+        ):  # Limit to first 10 for brevity
             print(f"Invalid state at index {idx}: {state}, Length: {len(state)}")
-    assert not invalid_states, f"Invalid state dimensions found: {len(invalid_states)} entries"
+    assert (
+        not invalid_states
+    ), f"Invalid state dimensions found: {len(invalid_states)} entries"
 
 
 def test_invalid_recent_actions(dataset):
@@ -103,7 +113,9 @@ def test_invalid_recent_actions(dataset):
         for _, _, _, _, recent_action in dataset
         if recent_action.item() not in valid_recent_actions
     ]
-    assert not invalid_recent_actions, f"Invalid recent actions found: {invalid_recent_actions}"
+    assert (
+        not invalid_recent_actions
+    ), f"Invalid recent actions found: {invalid_recent_actions}"
 
 
 def test_invalid_hand_strength_and_pot_odds(dataset):
@@ -112,4 +124,6 @@ def test_invalid_hand_strength_and_pot_odds(dataset):
         for state, _, _, _, _ in dataset
         if not (0 <= state[-2].item() <= 1) or not (0 <= state[-1].item() <= 1)
     ]
-    assert not invalid_hand_strengths_or_pot_odds, f"Invalid hand strengths or pot odds found: {invalid_hand_strengths_or_pot_odds}"
+    assert (
+        not invalid_hand_strengths_or_pot_odds
+    ), f"Invalid hand strengths or pot odds found: {invalid_hand_strengths_or_pot_odds}"

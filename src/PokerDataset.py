@@ -3,7 +3,8 @@ import torch
 from torch.utils.data import Dataset
 import logging
 from pathlib import Path
-from config import config  
+from config import config
+
 
 class PokerDataset(Dataset):
     def __init__(self, data_path):
