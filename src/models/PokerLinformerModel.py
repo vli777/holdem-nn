@@ -19,19 +19,6 @@ class PokerLinformerModel(nn.Module):
         self.input_projection = nn.Linear(input_dim, hidden_dim)
         self.player_dynamics = PlayerDynamicsAttention(hidden_dim, num_players)
 
-        # Transformer Encoder Layer
-        self.encoder_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_dim,
-            nhead=num_heads,
-            dim_feedforward=hidden_dim * 4,
-            dropout=0.1,
-            activation="gelu",
-            batch_first=True,
-        )
-        self.transformer_encoder = nn.TransformerEncoder(
-            self.encoder_layer, num_layers=1
-        )
-
         # Linformer encoder
         self.linformer = Linformer(
             dim=hidden_dim,
@@ -69,9 +56,6 @@ class PokerLinformerModel(nn.Module):
         # Player Dynamics Attention
         if positions is not None and player_ids is not None and actions is not None:
             x = self.player_dynamics(x, player_ids, actions, positions)
-
-        # Transformer Encoder
-        x = self.transformer_encoder(x)
 
         # Linformer Encoder
         x = self.linformer(x)

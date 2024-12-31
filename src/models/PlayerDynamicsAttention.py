@@ -4,13 +4,15 @@ import torch.nn as nn
 class PlayerDynamicsAttention(nn.Module):
     def __init__(self, hidden_dim, num_players, num_actions=3, max_positions=10):
         super().__init__()
+        
         self.hidden_dim = hidden_dim
-
         self.player_embeddings = nn.Embedding(num_players, hidden_dim)
         self.action_embeddings = nn.Embedding(num_actions, hidden_dim)
         self.position_embeddings = nn.Embedding(max_positions, hidden_dim)
 
         self.dropout = nn.Dropout(0.1)
+        self.projection = nn.Linear(hidden_dim, hidden_dim)  # Non-linear projection
+        self.layer_norm = nn.LayerNorm(hidden_dim)  # Normalize output
 
         nn.init.xavier_uniform_(self.player_embeddings.weight)
         nn.init.xavier_uniform_(self.action_embeddings.weight)
@@ -44,4 +46,9 @@ class PlayerDynamicsAttention(nn.Module):
             x.shape == position_embed.shape
         ), f"Shape mismatch: x ({x.shape}) and position_embed ({position_embed.shape})"
 
-        return x + player_embed + action_embed + position_embed
+        x = x + player_embed + action_embed + position_embed
+        
+        # Apply projection and normalization
+        x = self.layer_norm(self.projection(x))
+        
+        return x
