@@ -34,7 +34,13 @@ class PlayerDynamicsAttention(nn.Module):
         action_embed = self.action_embeddings(actions).unsqueeze(1)
         position_embed = self.dropout(self.position_embeddings(positions).unsqueeze(1))
 
-        x = x.unsqueeze(1)
+        # Ensure x has the correct shape
+        if x.ndim == 2:  # Shape: [batch, hidden_dim]
+            x = x.unsqueeze(1)  # Shape: [batch, 1, hidden_dim]
+        elif x.ndim == 3:  # Already [batch, 1, hidden_dim]
+            pass
+        else:
+            raise ValueError(f"Unexpected input shape for x: {x.shape}")
 
         assert (
             x.shape == player_embed.shape
@@ -46,6 +52,7 @@ class PlayerDynamicsAttention(nn.Module):
             x.shape == position_embed.shape
         ), f"Shape mismatch: x ({x.shape}) and position_embed ({position_embed.shape})"
 
+        # Add embeddings
         x = x + player_embed + action_embed + position_embed
 
         # Apply projection and normalization

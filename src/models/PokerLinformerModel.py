@@ -38,17 +38,11 @@ class PokerLinformerModel(nn.Module):
         device = x.device
 
         if positions is not None:
-            positions = positions.clamp(
-                0, self.player_dynamics.position_embeddings.num_embeddings - 1
-            ).to(device)
+            positions = positions.to(device)
         if player_ids is not None:
-            player_ids = player_ids.clamp(
-                0, self.player_dynamics.player_embeddings.num_embeddings - 1
-            ).to(device)
+            player_ids = player_ids.to(device)
         if actions is not None:
-            actions = actions.clamp(
-                0, self.player_dynamics.action_embeddings.num_embeddings - 1
-            ).to(device)
+            actions = actions.to(device)
 
         # Input Projection
         x = self.input_projection(x)
