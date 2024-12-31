@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Dataset
 import logging
 from pathlib import Path
-
+from config import config  
 
 class PokerDataset(Dataset):
     def __init__(self, data_path):
@@ -42,7 +42,7 @@ class PokerDataset(Dataset):
 
                     # Validate action field
                     action_label = action["action"]
-                    if action_label not in [0, 1, 2]:
+                    if action_label not in range(config.output_dim):
                         raise ValueError(f"Invalid encoded action: {action_label}")
 
                     state = action["state"]
@@ -51,9 +51,9 @@ class PokerDataset(Dataset):
                     recent_action = action["recent_action"]
 
                     # Confirm state dimension
-                    if len(state) != 4:
+                    if len(state) != config.input_dim:
                         raise ValueError(
-                            f"Expected state dimension 4, got {len(state)}"
+                            f"Expected state dimension {config.input_dim}, got {len(state)}"
                         )
 
                     precomputed_data.append(
