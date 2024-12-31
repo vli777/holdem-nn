@@ -102,9 +102,9 @@ if __name__ == "__main__":
     )
     start_time = time.time()
 
-    game_data = simulate_texas_holdem_parallel(num_players=6, num_games=10)
+    game_data = simulate_texas_holdem_parallel(num_players=6, num_games=100000)
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DATA_PATH = os.path.join(BASE_DIR, "data", "texas_holdem_data.npz")
 
     append_simulation_data(DATA_PATH, game_data)
