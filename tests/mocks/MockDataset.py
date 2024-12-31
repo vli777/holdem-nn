@@ -1,46 +1,41 @@
+import numpy as np
 import torch
 from torch.utils.data import Dataset
+
 from config import config
-import numpy as np
 
 
 class MockDataset(Dataset):
     def __init__(self, size=100):
         """
-        Initializes a mock dataset with random data mimicking PokerDataset.
+        Initializes a mock dataset with random data constrained by config.
 
         Args:
             size (int): Number of samples in the dataset.
         """
         self.size = size
 
-        # Generate random data for each required attribute
-        self.states = torch.randn(size, config.input_dim).numpy()  # State features
-        self.actions = np.random.randint(
-            0, config.output_dim, size
-        )  # Action labels (e.g., fold, call, raise)
-        self.positions = np.random.randint(
-            0, 10, size
-        )  # Player positions (e.g., seat positions 0-9)
-        self.player_ids = np.random.randint(
-            0, 5, size
-        )  # Player IDs (e.g., player numbers 0-4)
-        self.recent_actions = np.random.randint(
-            0, 3, size
-        )  # Recent actions encoded as integers
+        # Generate random data constrained by config values
+        # State features
+        self.states = np.random.rand(
+            size, config.input_dim + 10 + 5 + 3
+        )  # Match input_dim
+        self.actions = np.random.randint(0, config.output_dim, size)  # Actions
+        self.positions = np.random.randint(0, 10, size)  # Positions
+        self.player_ids = np.random.randint(0, 5, size)  # Player IDs
+        self.recent_actions = np.random.randint(0, 3, size)  # Recent actions
 
         # Combine all attributes into a structured array
-        precomputed_data = []
-        for i in range(size):
-            precomputed_data.append(
-                (
-                    self.states[i],
-                    self.actions[i],
-                    self.positions[i],
-                    self.player_ids[i],
-                    self.recent_actions[i],
-                )
+        precomputed_data = [
+            (
+                self.states[i],
+                self.actions[i],
+                self.positions[i],
+                self.player_ids[i],
+                self.recent_actions[i],
             )
+            for i in range(size)
+        ]
         self.data = np.array(precomputed_data, dtype=object)
 
         # Define labels for Stratified K-Fold (typically the target variable)
