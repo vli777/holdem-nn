@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 import random
-from treys import Evaluator, Card
+from treys import Evaluator, Card, Deck
 
 evaluator = Evaluator()
 
@@ -16,13 +16,10 @@ def evaluate_hand(hole_cards, community_cards):
     Returns:
         tuple: (hand_strength (int), hand_type (str))
     """
-    # Evaluate hand strength (lower is better in Treys)
-    hand_strength = evaluator.evaluate(hole_cards, community_cards)
-
-    # Get hand type (e.g., 'Pair', 'Straight', etc.)
-    hand_type = evaluator.class_to_string(evaluator.get_rank_class(hand_strength))
-
-    return hand_strength, hand_type
+    evaluator = Evaluator()
+    hand_strength = evaluator.evaluate(community_cards, hole_cards)
+    normalized_strength = 1 - (hand_strength / 7462.0)  # Normalize strength (0-1)
+    return normalized_strength
 
 
 def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="balanced"):
@@ -168,3 +165,21 @@ def filter_remaining_deck(deck, excluded_cards):
 
     logging.debug(f"Deck After Filtering: {Card.print_pretty_cards(remaining_deck)}")
     return remaining_deck
+
+
+def randomize_sample_action():
+    deck = Deck()
+    deck.shuffle()
+
+    hole_cards = [deck.draw(1), deck.draw(1)]
+    community_cards = [deck.draw(1) for _ in range(3)]  # Flop example
+
+    hand_strength = evaluate_hand(hole_cards, community_cards)
+    pot_odds = random.uniform(0.1, 0.9)
+
+    return {
+        "hole_cards": hole_cards,
+        "community_cards": community_cards,
+        "hand_strength": hand_strength,
+        "pot_odds": pot_odds,
+    }
