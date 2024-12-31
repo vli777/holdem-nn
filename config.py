@@ -1,8 +1,9 @@
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict 
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import ValidationError 
 
 class Settings(BaseSettings):
+    # General Configurations
     learning_rate: float = 1e-3
     batch_size: int = 32
     hidden_dim: int = 128
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
     data_path: Path = Path("data/texas_holdem_data.npz")
     debug: bool = False
 
+    # Configuration for Settings
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding='utf-8',
@@ -24,6 +26,6 @@ class Settings(BaseSettings):
 
 try:
     config = Settings()
-except:
-    print("Configuration validation error")
+except ValidationError as e:
+    print("Configuration validation error:", e)
     exit(1)
