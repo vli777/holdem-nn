@@ -3,8 +3,9 @@ from utils import encode_state
 
 
 class PokerPredictor:
-    def __init__(self, model_class, model_path, input_dim,
-                 hidden_dim, output_dim, **model_kwargs):
+    def __init__(
+        self, model_class, model_path, input_dim, hidden_dim, output_dim, **model_kwargs
+    ):
         """
         Initialize the predictor by loading the model.
         Args:
@@ -16,7 +17,11 @@ class PokerPredictor:
             **model_kwargs: Additional keyword arguments for the model (e.g., num_heads, num_layers, seq_len).
         """
         self.model = model_class(
-            input_dim=input_dim, hidden_dim=hidden_dim, output_dim=output_dim, **model_kwargs)
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            output_dim=output_dim,
+            **model_kwargs,
+        )
         self.model.load_state_dict(torch.load(model_path, weights_only=True))
         self.model.eval()  # Set the model to evaluation mode
 
@@ -36,7 +41,7 @@ class PokerPredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)  # Add batch and seq length dimensions
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)
 
         # Predict
         policy_logits, _ = self.model(input_tensor)
@@ -44,21 +49,3 @@ class PokerPredictor:
 
         # Map prediction to action name
         return self.action_map[predicted_action]
-
-
-    def display_hand(self, sample_action):
-        """
-        Format and display the hand state for logging or debugging.
-        Args:
-            sample_action (dict): The hand state.
-        """
-        hole_cards = [str(card) for card in sample_action["hole_cards"]]
-        community_cards = [str(card)
-                           for card in sample_action["community_cards"]]
-        hand_strength = sample_action["hand_strength"]
-        pot_odds = sample_action["pot_odds"]
-
-        print(f"Hole Cards: {hole_cards}")
-        print(f"Community Cards: {community_cards}")
-        print(f"Hand Strength: {hand_strength}")
-        print(f"Pot Odds: {pot_odds}")

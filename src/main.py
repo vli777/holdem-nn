@@ -2,14 +2,15 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
+from treys import Evaluator, Card
 from models.PokerLinformerModel import PokerLinformerModel
+from utils import calculate_pot_odds
 from .predictors.PokerPredictor import PokerPredictor
 from .predictors.PokerEnsemblePredictor import PokerEnsemblePredictor
-from .training.generate_data import monte_carlo_hand_strength
-import eval7
 from pathlib import Path
 import logging
+
+evaluator = Evaluator()
 
 # Set up logging
 logging.basicConfig(
@@ -37,17 +38,20 @@ MODEL_DIR = BASE_DIR / "saved_models"
 FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
 ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pth" for i in range(1, 6)]
 
-# Model parameters    
-input_dim = 106
+# Model parameters
+input_dim = 2
 hidden_dim = 128
 output_dim = 3
 num_heads = 4
 num_layers = 2
 seq_len = 1
-    
+
 # Initialize predictors
-predictors = {
-    "standard": PokerPredictor(
+predictors = {}
+
+# Initialize PokerPredictor
+if FULL_MODEL_PATH.exists():
+    predictors["standard"] = PokerPredictor(
         model_class=PokerLinformerModel,
         model_path=FULL_MODEL_PATH,
         input_dim=input_dim,
@@ -56,8 +60,22 @@ predictors = {
         seq_len=seq_len,
         num_heads=num_heads,
         num_layers=num_layers,
-    ),
-    "ensemble": PokerEnsemblePredictor(
+    )
+    logger.info("Standard PokerPredictor initialized.")
+else:
+    logger.error(f"Standard model file not found at {FULL_MODEL_PATH}.")
+    predictors["standard"] = None  # Or set to a dummy predictor
+
+# Initialize PokerEnsemblePredictor
+ensemble_models_loaded = True
+for path in ENSEMBLE_MODEL_PATHS:
+    if not path.exists():
+        logger.error(f"Ensemble model file not found at {path}.")
+        ensemble_models_loaded = False
+        break
+
+if ensemble_models_loaded:
+    predictors["ensemble"] = PokerEnsemblePredictor(
         model_class=PokerLinformerModel,
         model_paths=ENSEMBLE_MODEL_PATHS,
         input_dim=input_dim,
@@ -67,44 +85,67 @@ predictors = {
         num_heads=num_heads,
         num_layers=num_layers,
     )
-}
+    logger.info("Ensemble PokerPredictor initialized.")
+else:
+    logger.error("Ensemble model files not found. Ensemble predictor not initialized.")
+    predictors["ensemble"] = None  # Or set to a dummy predictor
+
 
 # Input data model
 class HandState(BaseModel):
-    hole_cards: List[str] = Field(..., description="Two hole cards in standard poker notation, e.g., ['Ah', 'Kd']")
-    community_cards: List[str] = Field(..., description="Community cards in standard poker notation, e.g., ['Qs', 'Jd']")
+    hole_cards: List[str] = Field(
+        ..., description="Two hole cards in standard poker notation, e.g., ['Ah', 'Kd']"
+    )
+    community_cards: List[str] = Field(
+        ...,
+        description="Community cards in standard poker notation, e.g., ['Qs', 'Jd']",
+    )
+
 
 # Output response model
 class PredictionResponse(BaseModel):
-    predicted_action: str = Field(..., description="Predicted action: 'fold', 'call', or 'raise'")
+    predicted_action: str = Field(
+        ..., description="Predicted action: 'fold', 'call', or 'raise'"
+    )
 
-def calculate_pot_odds(current_pot, bet_amount):
-    """
-    Calculate pot odds given the current pot size and the bet amount.
-    """
-    return bet_amount / (current_pot + bet_amount) if current_pot + bet_amount > 0 else 0
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict_action(
     hand_state: HandState,
-    predictor_type: Optional[str] = Query("standard", enum=["standard", "ensemble"], description="standard or ensemble (default standard)"),
-    current_pot: Optional[float] = Query(100.0, description="Current pot size (default 100)"),
-    bet_amount: Optional[float] = Query(10.0, description="Current bet amount (default 10)"),
-    num_simulations: Optional[int] = Query(1000, description="Number of simulations for hand strength estimation")
+    predictor_type: Optional[str] = Query(
+        "standard",
+        enum=["standard", "ensemble"],
+        description="standard or ensemble (default standard)",
+    ),
+    current_pot: Optional[float] = Query(
+        100.0, description="Current pot size (default 100)"
+    ),
+    bet_amount: Optional[float] = Query(
+        10.0, description="Current bet amount (default 10)"
+    ),
 ):
     """
     Predict the poker action for a given hand state using either PokerPredictor or PokerEnsemblePredictor.
     """
     try:
-        # Input conversion
-        logging.info("Converting input cards to eval7.Card objects...")
-        hole_cards = [eval7.Card(card) for card in hand_state.hole_cards]
-        community_cards = [eval7.Card(card) for card in hand_state.community_cards]
+        predictor = predictors.get(predictor_type)
+        if predictor is None:
+            logger.error(f"Predictor type '{predictor_type}' is not available.")
+            raise HTTPException(
+                status_code=503,
+                detail="Predictor not available due to missing model files.",
+            )
 
-        # Calculate hand strength
-        logging.info("Calculating hand strength...")
-        hand_strength = monte_carlo_hand_strength(hole_cards, community_cards, num_simulations=num_simulations)
-        logging.info(f"Hand strength calculated: {hand_strength}")
+        # Convert input cards to Treys format
+        logging.info("Converting input cards to Treys format...")
+        hole_cards = [Card.new(card) for card in hand_state.hole_cards]
+        community_cards = [Card.new(card) for card in hand_state.community_cards]
+
+        # Calculate hand strength using Treys Evaluator
+        logging.info("Calculating hand strength using Treys...")
+        hand_strength = evaluator.evaluate(hole_cards, community_cards)
+        normalized_hand_strength = 1 - (hand_strength / 7462.0)  # Normalize (0-1)
+        logging.info(f"Normalized hand strength: {normalized_hand_strength:.4f}")
 
         # Calculate pot odds
         logging.info("Calculating pot odds...")
@@ -115,15 +156,10 @@ def predict_action(
         sample_action = {
             "hole_cards": hole_cards,
             "community_cards": community_cards,
-            "hand_strength": hand_strength,
+            "hand_strength": normalized_hand_strength,  # Use only normalized strength
             "pot_odds": pot_odds,
         }
         logging.info(f"Sample action prepared: {sample_action}")
-
-        # Select predictor
-        predictor = predictors.get(predictor_type)
-        if predictor is None:
-            raise HTTPException(status_code=400, detail="Invalid predictor type")
 
         # Predict action
         logging.info(f"Using predictor: {predictor_type}")
@@ -137,7 +173,9 @@ def predict_action(
 
     except Exception as e:
         logging.error(f"Unexpected error during prediction: {e}")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred during prediction.")
+        raise HTTPException(
+            status_code=500, detail="An unexpected error occurred during prediction."
+        )
 
 
 @app.get("/")

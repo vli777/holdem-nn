@@ -1,133 +1,150 @@
 import pytest
 import torch
 from torch.utils.data import Dataset
-from training.cross_validation import k_fold_cross_validation
 from models.PokerLinformerModel import PokerLinformerModel
+from training.cross_validation import k_fold_cross_validation
+from tests.mocks.MockDataset import MockDataset
+import logging
+from config import config
 
-# Mock Dataset
-class MockDataset(Dataset):
-    def __init__(self, size=100):
-        self.size = size
-        self.data = [
-            (
-                torch.rand(106),  # Random state vector
-                torch.randint(0, 3, (1,)).item(),  # Random action (0, 1, 2)
-                torch.randint(0, 10, (1,)).item(),  # Random position
-                torch.randint(0, 6, (1,)).item(),  # Random player ID
-                torch.randint(0, 3, (1,)).item()  # Random recent action
-            )
-            for _ in range(size)
-        ]
-
-    def __len__(self):
-        return self.size
-
-    def __getitem__(self, idx):
-        return self.data[idx]
-
-# Mock Model
-class MockModel(PokerLinformerModel):
-    def forward(self, states, positions, player_ids, recent_actions):
-        batch_size = states.size(0)
-        policy_logits = torch.rand(batch_size, 3, requires_grad=True)  # Policy logits
-        value = torch.rand(batch_size, 1, requires_grad=True)          # Value
-        return policy_logits, value
-    
 
 @pytest.fixture
 def setup_mock_data():
     dataset = MockDataset(size=100)
     model_params = {
-        "input_dim": 106,
-        "hidden_dim": 128,
-        "output_dim": 3,
-        "seq_len": 1,
-        "num_heads": 4,
-        "num_layers": 2,
+        "input_dim": config.input_dim
+        + 10
+        + 5
+        + 3,  # Combined input dimensions: states + positions + player_ids + recent_actions
+        "hidden_dim": config.hidden_dim,
+        "output_dim": config.output_dim,
+        "seq_len": config.seq_len,
+        "num_heads": config.num_heads,
+        "num_layers": config.num_layers,
+        "num_players": 6,  # As per actual model
     }
+    assert model_params["input_dim"] == config.input_dim + 10 + 5 + 3
+    assert model_params["hidden_dim"] == config.hidden_dim
     return dataset, model_params
 
-def test_k_fold_cross_validation_valid_data(setup_mock_data, tmp_path):
+
+def test_k_fold_cross_validation_valid_data(setup_mock_data, tmp_path, caplog):
     dataset, model_params = setup_mock_data
     model_save_dir = tmp_path / "models"
-    model_save_dir.mkdir()
+    model_save_dir.mkdir(parents=True, exist_ok=True)
 
-    results = k_fold_cross_validation(
-        dataset=dataset,
-        device=torch.device("cpu"),
-        model_class=MockModel,
-        model_params=model_params,
-        criterion=torch.nn.CrossEntropyLoss(),
-        optimizer_class=torch.optim.Adam,
-        optimizer_params={"lr": 1e-3},
-        k=5,
-        epochs=3,
-        batch_size=16,
-        model_save_dir=str(model_save_dir)
-    )
-
-    # Check results
-    assert len(results) == 5  # 5 folds
-    for result in results:
-        assert "train_loss" in result
-        assert "val_loss" in result
-        assert "val_accuracy" in result
-
-    # Check that model weights are saved
-    saved_models = list(model_save_dir.glob("*.pth"))
-    assert len(saved_models) == 5  # One model per fold
-
-def test_k_fold_cross_validation_empty_dataset(tmp_path):
-    dataset = MockDataset(size=0)  # Empty dataset
-    model_params = {
-        "input_dim": 106,
-        "hidden_dim": 128,
-        "output_dim": 3,
-        "seq_len": 1,
-        "num_heads": 4,
-        "num_layers": 2,
-    }
-    model_save_dir = tmp_path / "models"
-    model_save_dir.mkdir()
-
-    with pytest.raises(ValueError, match=r"Found array with 0 sample\(s\) .* while a minimum of 1 is required\."):
-        k_fold_cross_validation(
+    with caplog.at_level(logging.WARNING):
+        results = k_fold_cross_validation(
             dataset=dataset,
             device=torch.device("cpu"),
-            model_class=MockModel,
+            model_class=PokerLinformerModel,
             model_params=model_params,
             criterion=torch.nn.CrossEntropyLoss(),
             optimizer_class=torch.optim.Adam,
-            optimizer_params={"lr": 1e-3},
+            optimizer_params={"lr": config.learning_rate},
             k=5,
             epochs=3,
-            batch_size=16,
-            model_save_dir=str(model_save_dir)
+            batch_size=config.batch_size,
+            model_save_dir=str(model_save_dir),
         )
 
-     
-def test_k_fold_cross_validation_early_stopping(setup_mock_data, tmp_path):
+    # Check results
+    assert len(results) == 5, "Expected results for all 5 folds"
+    for fold_result in results:
+        assert "fold" in fold_result, "Missing 'fold' key in results"
+        assert "train_loss" in fold_result, "Missing 'train_loss' key in results"
+        assert "val_loss" in fold_result, "Missing 'val_loss' key in results"
+        assert "val_accuracy" in fold_result, "Missing 'val_accuracy' key in results"
+
+    # Check that model weights are saved
+    saved_models = list(model_save_dir.glob("best_model_fold*.pth"))
+    assert len(saved_models) == 5, "Expected one saved model per fold"
+
+    # Ensure no warnings about parameters not requiring grad
+    for record in caplog.records:
+        assert (
+            "does not require gradients" not in record.message
+        ), "Model parameters should require gradients"
+
+
+def test_k_fold_cross_validation_empty_dataset(tmp_path):
+    class EmptyDataset(Dataset):
+        def __init__(self):
+            self.data = []
+            self.labels = []
+
+        def __len__(self):
+            return 0
+
+        def __getitem__(self, idx):
+            raise IndexError("Dataset is empty")
+
+    dataset = EmptyDataset()
+    model_params = {
+        "input_dim": config.input_dim + 10 + 5 + 3,  # Combined input dimensions
+        "hidden_dim": config.hidden_dim,
+        "output_dim": config.output_dim,
+        "seq_len": config.seq_len,
+        "num_heads": config.num_heads,
+        "num_layers": config.num_layers,
+        "num_players": 6,
+    }
+    model_save_dir = tmp_path / "models"
+    model_save_dir.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(
+        ValueError,
+        match=r"Found array with 0 sample\(s\) .* while a minimum of 1 is required\.",
+    ):
+        k_fold_cross_validation(
+            dataset=dataset,
+            device=torch.device("cpu"),
+            model_class=PokerLinformerModel,
+            model_params=model_params,
+            criterion=torch.nn.CrossEntropyLoss(),
+            optimizer_class=torch.optim.Adam,
+            optimizer_params={"lr": config.learning_rate},
+            k=5,
+            epochs=3,
+            batch_size=config.batch_size,
+            model_save_dir=str(model_save_dir),
+        )
+
+
+def test_k_fold_cross_validation_early_stopping(setup_mock_data, tmp_path, caplog):
     dataset, model_params = setup_mock_data
     model_save_dir = tmp_path / "models"
-    model_save_dir.mkdir()
+    model_save_dir.mkdir(parents=True, exist_ok=True)
 
-    results = k_fold_cross_validation(
-        dataset=dataset,
-        device=torch.device("cpu"),
-        model_class=MockModel,
-        model_params=model_params,
-        criterion=torch.nn.CrossEntropyLoss(),
-        optimizer_class=torch.optim.Adam,
-        optimizer_params={"lr": 1e-3},
-        k=5,
-        epochs=20,  # Longer epochs to test early stopping
-        batch_size=16,
-        model_save_dir=str(model_save_dir)
-    )
+    with caplog.at_level(logging.INFO):
+        results = k_fold_cross_validation(
+            dataset=dataset,
+            device=torch.device("cpu"),
+            model_class=PokerLinformerModel,
+            model_params=model_params,
+            criterion=torch.nn.CrossEntropyLoss(),
+            optimizer_class=torch.optim.Adam,
+            optimizer_params={"lr": config.learning_rate},
+            k=5,
+            epochs=20,  # Longer epochs to test early stopping
+            batch_size=config.batch_size,
+            model_save_dir=str(model_save_dir),
+        )
 
-    # Verify early stopping worked (e.g., fewer epochs completed than specified)
-    assert len(results) == 5
-    for result in results:
-        assert "train_loss" in result
-        assert "val_loss" in result
-        assert "val_accuracy" in result
+    # Check results
+    assert len(results) == 5, "Expected results for all 5 folds"
+    for fold_result in results:
+        assert "fold" in fold_result, "Missing 'fold' key in results"
+        assert "train_loss" in fold_result, "Missing 'train_loss' key in results"
+        assert "val_loss" in fold_result, "Missing 'val_loss' key in results"
+        assert "val_accuracy" in fold_result, "Missing 'val_accuracy' key in results"
+
+    # Check that model weights are saved
+    saved_models = list(model_save_dir.glob("best_model_fold*.pth"))
+    assert len(saved_models) == 5, "Expected one saved model per fold"
+
+    # Check if early stopping logs are present
+    early_stop_logs = [
+        record for record in caplog.records if "Early stopping" in record.message
+    ]
+    assert len(early_stop_logs) >= 1, "Expected early stopping logs"
