@@ -4,7 +4,7 @@ import torch.nn as nn
 class PlayerDynamicsAttention(nn.Module):
     def __init__(self, hidden_dim, num_players, num_actions=3, max_positions=10):
         super().__init__()
-        
+
         self.hidden_dim = hidden_dim
         self.player_embeddings = nn.Embedding(num_players, hidden_dim)
         self.action_embeddings = nn.Embedding(num_actions, hidden_dim)
@@ -47,8 +47,8 @@ class PlayerDynamicsAttention(nn.Module):
         ), f"Shape mismatch: x ({x.shape}) and position_embed ({position_embed.shape})"
 
         x = x + player_embed + action_embed + position_embed
-        
+
         # Apply projection and normalization
         x = self.layer_norm(self.projection(x))
-        
+
         return x

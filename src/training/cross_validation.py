@@ -96,7 +96,7 @@ def k_fold_cross_validation(
 
     for fold, (train_indices, val_indices) in enumerate(
         # (fold, call, raise)
-        kfold.split(dataset.data, dataset.labels) 
+        kfold.split(dataset.data, dataset.labels)
     ):
         logging.info(f"Fold {fold + 1}/{k}")
 

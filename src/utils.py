@@ -5,6 +5,7 @@ from treys import Evaluator, Card, Deck
 
 evaluator = Evaluator()
 
+
 def evaluate_hand(hole_cards, community_cards):
     """
     Evaluate the strength and type of a poker hand.
@@ -22,7 +23,9 @@ def evaluate_hand(hole_cards, community_cards):
     return normalized_strength
 
 
-def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="balanced"):
+def decide_action(
+    hand_strength, pot_odds, bluffing_probability, player_type="balanced"
+):
     """
     Decide an action based on hand strength, pot odds, and bluffing.
 
@@ -54,7 +57,6 @@ def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="ba
         elif normalized_strength > 0.3:
             return "call"
         return "fold"
-
 
 
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
@@ -151,7 +153,9 @@ def filter_remaining_deck(deck, excluded_cards):
     """
     # Ensure all excluded cards are integers
     excluded_cards_set = set(excluded_cards)
-    logging.debug(f"Excluded Cards: {Card.print_pretty_cards(list(excluded_cards_set))}")
+    logging.debug(
+        f"Excluded Cards: {Card.print_pretty_cards(list(excluded_cards_set))}"
+    )
 
     # Remove excluded cards from the deck
     remaining_deck = [card for card in deck.cards if card not in excluded_cards_set]

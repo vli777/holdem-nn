@@ -46,8 +46,7 @@ class PokerEnsemblePredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = (
-            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0))
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)
 
         # Aggregate predictions from all models
         outputs = []
@@ -75,7 +74,6 @@ class PokerEnsemblePredictor:
         # Encode the state
         encoded_state = encode_state(**sample_action)
         input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)
-
 
         # Aggregate predictions
         outputs = []

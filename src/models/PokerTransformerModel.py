@@ -69,6 +69,7 @@ class PokerTransformerModel(nn.Module):
         x = self.classifier(x)
         return x
 
+
 class PositionalEncoding(nn.Module):
     def __init__(self, hidden_dim, max_len=5000):
         """

@@ -152,7 +152,8 @@ def predict_action(
         raise HTTPException(
             status_code=500, detail="An unexpected error occurred during prediction."
         )
-        
+
+
 @app.get("/")
 def root():
     """

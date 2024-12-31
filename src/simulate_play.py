@@ -1,6 +1,7 @@
 import logging
 from treys import Deck, Evaluator, Card
 
+
 def determine_optimal_action(player_strength, max_opponent_strength):
     """
     Determine the optimal action based on the player's and opponent's hand strengths.
@@ -18,6 +19,7 @@ def determine_optimal_action(player_strength, max_opponent_strength):
         return "raise"
     else:
         return "call"
+
 
 def play_out_game(predictor, sample_action, num_players=6):
     deck = Deck()
@@ -72,7 +74,9 @@ def play_out_game(predictor, sample_action, num_players=6):
         logging.info(f"New Community Card: {Card.int_to_pretty_str(new_card)}")
 
     # Deal opponent hands
-    opponent_hands = [[deck.draw(1)[0], deck.draw(1)[0]] for _ in range(num_players - 1)]
+    opponent_hands = [
+        [deck.draw(1)[0], deck.draw(1)[0]] for _ in range(num_players - 1)
+    ]
     logging.info(
         f"Opponent Hands: {[[Card.int_to_pretty_str(card) for card in hand] for hand in opponent_hands]}"
     )

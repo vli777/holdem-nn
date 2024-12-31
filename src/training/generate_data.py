@@ -5,10 +5,19 @@ import numpy as np
 import os
 import time
 from multiprocessing import Pool
-from utils import calculate_pot_odds, decide_action, encode_state, encode_action, evaluate_hand
+from utils import (
+    calculate_pot_odds,
+    decide_action,
+    encode_state,
+    encode_action,
+    evaluate_hand,
+)
 from treys import Deck
 
-def simulate_texas_holdem(num_players: int = 6, num_games: int = 1000, bluffing_strategy=None) -> list:
+
+def simulate_texas_holdem(
+    num_players: int = 6, num_games: int = 1000, bluffing_strategy=None
+) -> list:
     """
     Simulate Texas Hold'em games and collect state-action pairs.
 
@@ -79,7 +88,9 @@ def simulate_texas_holdem(num_players: int = 6, num_games: int = 1000, bluffing_
                 bet_to_call = random.randint(2, 10)
                 current_pot += bet_to_call
 
-                hand_strength = evaluate_hand(player_hole_cards[player], community_cards)
+                hand_strength = evaluate_hand(
+                    player_hole_cards[player], community_cards
+                )
                 pot_odds = calculate_pot_odds(current_pot, bet_to_call)
                 action = decide_action(hand_strength, pot_odds, bluffing_probability)
 
@@ -101,6 +112,7 @@ def simulate_texas_holdem(num_players: int = 6, num_games: int = 1000, bluffing_
 
     return game_data
 
+
 def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) -> list:
     """
     Parallel simulation of Texas Hold'em games.
@@ -118,6 +130,7 @@ def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) 
             range(num_games),
         )
     return [game for result in results for game in result]  # Flatten results
+
 
 def append_simulation_data(file_path: str, new_data: list):
     """
@@ -139,6 +152,7 @@ def append_simulation_data(file_path: str, new_data: list):
 
     np.savez_compressed(file_path, updated_data=updated_data)
     logging.info(f"Data saved to {file_path}. Total samples: {len(updated_data)}")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
