@@ -41,9 +41,7 @@ class PokerPredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = (
-            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)
-        )  # Add batch and seq length dimensions
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)
 
         # Predict
         policy_logits, _ = self.model(input_tensor)

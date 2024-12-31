@@ -47,14 +47,14 @@ class PokerEnsemblePredictor:
         # Encode the state
         encoded_state = encode_state(**sample_action)
         input_tensor = (
-            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)
-        )  # Add batch dimension
+            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0))
 
         # Aggregate predictions from all models
         outputs = []
         for model in self.models:
             with torch.no_grad():
-                outputs.append(model(input_tensor)[0])
+                policy_logits, _ = model(input_tensor)
+                outputs.append(policy_logits)
 
         # Average the outputs across the ensemble
         avg_output = torch.mean(torch.stack(outputs), dim=0)
@@ -74,15 +74,15 @@ class PokerEnsemblePredictor:
         """
         # Encode the state
         encoded_state = encode_state(**sample_action)
-        input_tensor = (
-            torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0).unsqueeze(1)
-        )  # Add batch dimension
+        input_tensor = torch.tensor(encoded_state, dtype=torch.float32).unsqueeze(0)
+
 
         # Aggregate predictions
         outputs = []
         for model in self.models:
             with torch.no_grad():
-                outputs.append(model(input_tensor)[0])
+                policy_logits, _ = model(input_tensor)
+                outputs.append(policy_logits)
         avg_output = torch.mean(torch.stack(outputs), dim=0)  # Average predictions
 
         # Calculate confidence
