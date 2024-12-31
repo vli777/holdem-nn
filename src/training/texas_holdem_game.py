@@ -5,7 +5,6 @@ from treys import Deck
 
 from utils import (
     calculate_pot_odds,
-    decide_action,
     encode_action,
     encode_state,
     evaluate_hand,
@@ -13,9 +12,8 @@ from utils import (
 
 
 class TexasHoldemGame:
-    def __init__(self, num_players=6, bluffing_probability=0.2, starting_chips=1000):
+    def __init__(self, num_players=6, starting_chips=1000):
         self.num_players = num_players
-        self.bluffing_probability = bluffing_probability
         self.starting_chips = starting_chips
 
         # Create players with random or assigned strategies
@@ -25,6 +23,7 @@ class TexasHoldemGame:
                 player_id=i,
                 strategy=random.choice(strategies),
                 starting_chips=starting_chips,
+                bluffing_probability=0.05 + random.random() * 0.15,
             )
             for i in range(num_players)
         ]
@@ -91,11 +90,10 @@ class TexasHoldemGame:
             normalized_strength = evaluate_hand(p.hole_cards, self.community_cards)
             pot_odds = calculate_pot_odds(self.current_pot, bet_to_call)
 
-            action_str = decide_action(
-                normalized_hand_strength=normalized_strength,
+            action_str = p.opponent_behavior.decide_action(
+                hand_strength=normalized_strength,
                 pot_odds=pot_odds,
-                bluffing_probability=self.bluffing_probability,
-                player_type=p.strategy,
+                position=p.player_id,
             )
 
             p.last_action = action_str
@@ -110,7 +108,6 @@ class TexasHoldemGame:
                 self.current_pot += call_amount
                 logging.info(f"Player {p.player_id} calls {call_amount}.")
             elif action_str == "raise":
-                # This is where we know a raise occurred
                 raise_amount = bet_to_call + self.minimum_raise
                 raise_amount = min(p.chips, raise_amount)
                 p.chips -= raise_amount
@@ -194,6 +191,7 @@ class TexasHoldemGame:
         # Pre-flop betting with multiple passes
         self.multi_betting_round(round_name="pre-flop")
         if self.count_in_hand() < 2:
+            self.showdown()
             return
 
         # Flop
@@ -201,6 +199,7 @@ class TexasHoldemGame:
         self.reset_bets_for_next_round()
         self.multi_betting_round(round_name="flop")
         if self.count_in_hand() < 2:
+            self.showdown()
             return
 
         # Turn
@@ -208,6 +207,7 @@ class TexasHoldemGame:
         self.reset_bets_for_next_round()
         self.multi_betting_round(round_name="turn")
         if self.count_in_hand() < 2:
+            self.showdown()
             return
 
         # River
@@ -215,6 +215,7 @@ class TexasHoldemGame:
         self.reset_bets_for_next_round()
         self.multi_betting_round(round_name="river")
         if self.count_in_hand() < 2:
+            self.showdown()
             return
 
         self.showdown()
