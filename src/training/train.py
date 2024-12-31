@@ -1,20 +1,40 @@
-import os
+import random
 import torch
 import logging
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 from models.PokerLinformerModel import PokerLinformerModel
 from PokerDataset import PokerDataset
+from config import config
 
 
-# Function to load and validate dataset
-def load_dataset(data_path):
+def load_dataset(data_path, max_samples=None, shuffle_subset=False):
+    """
+    Load the Poker dataset, optionally limiting it to a smaller subset.
+
+    Args:
+        data_path (str): Path to the .npz data file.
+        max_samples (int, optional): If not None, the maximum number of samples to load.
+        shuffle_subset (bool): Whether to shuffle before taking the subset.
+    """
     try:
         dataset = PokerDataset(data_path)
-        logging.info(f"Dataset loaded. Total samples: {len(dataset)}")
+        logging.info(f"Full dataset loaded. Total samples: {len(dataset)}")
+
         if len(dataset) == 0:
             raise ValueError("Dataset is empty!")
+
+        if max_samples is not None and max_samples < len(dataset):
+            # Optionally shuffle, then slice the first `max_samples`
+            indices = list(range(len(dataset)))
+            if shuffle_subset:
+                random.shuffle(indices)
+            subset_indices = indices[:max_samples]
+
+            dataset = Subset(dataset, subset_indices)
+            logging.info(f"Using partial dataset with {len(subset_indices)} samples.")
+
         return dataset
     except Exception as e:
         logging.error(f"Error loading dataset: {e}")
@@ -23,6 +43,9 @@ def load_dataset(data_path):
 
 # Function to initialize the model, optimizer, and scheduler
 def initialize_model(input_dim, device, config):
+    model_dir = config["model_path"].parent
+    model_dir.mkdir(parents=True, exist_ok=True)
+
     model = PokerLinformerModel(
         input_dim=input_dim,
         hidden_dim=config["hidden_dim"],
@@ -99,15 +122,14 @@ def validate(model, val_loader, criterion, device):
 
     val_loss /= max(len(val_loader), 1)
     accuracy = correct / total * 100 if total > 0 else 0
-    f1 = f1_score(true_labels, predicted_labels, average="weighted")
+    f1 = f1_score(true_labels, predicted_labels, average="macro")
 
     return val_loss, accuracy, f1
 
 
 # Function to perform full training
-def train_and_validate(dataset, device, config):
-    input_dim = len(dataset[0][0])  # Dynamically fetch input dimension
-
+def train(dataset, device, config):
+    input_dim = len(dataset[0][0])
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
@@ -183,36 +205,29 @@ def train_and_validate(dataset, device, config):
 # Main function
 def main():
     logging.basicConfig(level=logging.INFO)
+    data_path = config.data_path
 
     # Configuration
-    config = {
-        "learning_rate": 1e-3,
-        "batch_size": 32,
-        "hidden_dim": 128,
-        "output_dim": 3,
-        "seq_len": 1,
-        "num_heads": 4,
-        "num_layers": 2,
-        "num_epochs": 10,
-        "early_stop_limit": 5,
-        "model_path": "models/poker_model_full.pth",
+    model_hyperparameters = {
+        "learning_rate": config.learning_rate,
+        "batch_size": config.batch_size,
+        "hidden_dim": config.hidden_dim,
+        "output_dim": config.output_dim,
+        "seq_len": config.seq_len,
+        "num_heads": config.num_heads,
+        "num_layers": config.num_layers,
+        "num_epochs": config.num_epochs,
+        "early_stop_limit": config.early_stop_limit,
+        "model_path": config.model_path,
     }
-
-    # Paths
-    base_dir = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-    data_path = os.path.join(base_dir, "data", "texas_holdem_data.npz")
 
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logging.info(f"Using device: {device}")
 
-    # Load dataset
-    dataset = load_dataset(data_path)
+    dataset = load_dataset(data_path, max_samples=10000, shuffle_subset=True)
 
-    # Train and validate
-    train_and_validate(dataset, device, config)
+    train(dataset, device, model_hyperparameters)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-# tests/test_PokerDataset.py
-
 import pytest
 import numpy as np
 import torch

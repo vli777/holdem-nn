@@ -1,11 +1,6 @@
 import numpy as np
-import os
-import sys
 from pathlib import Path
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 from config import config
-
 
 DATA_PATH = config.data_path
 

@@ -4,8 +4,8 @@ from torch.utils.data import Dataset
 from models.PokerLinformerModel import PokerLinformerModel
 from training.cross_validation import k_fold_cross_validation
 from tests.mocks.MockDataset import MockDataset
-from config import config
 import logging
+from config import config
 
 
 @pytest.fixture
