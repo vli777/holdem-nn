@@ -1,6 +1,7 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationError 
+from pydantic import ValidationError
+
 
 class Settings(BaseSettings):
     # General Configurations
@@ -21,8 +22,9 @@ class Settings(BaseSettings):
     # Configuration for Settings
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_file_encoding='utf-8',
+        env_file_encoding="utf-8",
     )
+
 
 try:
     config = Settings()
