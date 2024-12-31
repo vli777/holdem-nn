@@ -1,132 +1,102 @@
 import numpy as np
 import logging
-import eval7
+import random
+from treys import Evaluator, Card
+
+evaluator = Evaluator()
+
+def evaluate_hand(hole_cards, community_cards):
+    """
+    Evaluate the strength and type of a poker hand.
+
+    Args:
+        hole_cards (list[int]): Player's hole cards as Treys card integers.
+        community_cards (list[int]): Community cards on the table as Treys card integers.
+
+    Returns:
+        tuple: (hand_strength (int), hand_type (str))
+    """
+    # Evaluate hand strength (lower is better in Treys)
+    hand_strength = evaluator.evaluate(hole_cards, community_cards)
+
+    # Get hand type (e.g., 'Pair', 'Straight', etc.)
+    hand_type = evaluator.class_to_string(evaluator.get_rank_class(hand_strength))
+
+    return hand_strength, hand_type
+
+
+def decide_action(hand_strength, pot_odds, bluffing_probability, player_type="balanced"):
+    """
+    Decide an action based on hand strength, pot odds, and bluffing.
+
+    Args:
+        hand_strength (int): Treys hand strength (1-7462).
+        pot_odds (float): Current pot odds (0-1).
+        bluffing_probability (float): Chance of bluffing.
+        player_type (str): Type of player strategy (e.g., "tight-aggressive", "loose-passive", "balanced").
+
+    Returns:
+        str: Action ("fold", "call", "raise").
+    """
+    # Normalize hand strength (lower is better in Treys)
+    normalized_strength = 1 - (hand_strength / 7462.0)
+
+    if player_type == "tight-aggressive":
+        if normalized_strength > pot_odds:
+            return "raise" if random.random() > 0.3 else "call"
+        return "fold"
+    elif player_type == "loose-passive":
+        if random.random() < bluffing_probability:
+            return "call"
+        return "fold" if normalized_strength < 0.2 else "call"
+    else:  # Balanced player
+        if random.random() < bluffing_probability:
+            return "raise" if random.random() > 0.5 else "call"
+        if normalized_strength > pot_odds:
+            return "raise" if random.random() > 0.7 else "call"
+        elif normalized_strength > 0.3:
+            return "call"
+        return "fold"
+
 
 
 def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
     """
-    Encodes the player's state as a feature vector.
+    Encodes the player's state as a feature vector, optimized for opponent modeling.
 
     Args:
-        hole_cards (list[eval7.Card]): The player's hole cards.
-        community_cards (list[eval7.Card]): The shared community cards.
-        hand_strength (float): The strength of the player's hand (normalized to [0, 1]).
+        hole_cards (list[int]): The player's hole cards (Treys integer format).
+        community_cards (list[int]): The shared community cards (Treys integer format).
+        hand_strength (int): Treys hand strength (1-7462).
         pot_odds (float): The current pot odds (normalized to [0, 1]).
 
     Returns:
-        np.ndarray: A concatenated feature vector representing the player's state.
+        np.ndarray: A feature vector representing the player's state.
     """
-    if not hole_cards:
-        raise ValueError("Hole cards are empty. This is not valid.")
+    # Normalize hand strength (1 is best, 0 is worst)
+    normalized_strength = 1 - (hand_strength / 7462.0)
 
-    # Handle empty community cards gracefully (pre-flop)
-    community_cards = community_cards or []
+    # Combine cards and numerical features
+    cards_vector = np.array(hole_cards + community_cards, dtype=np.float32)
+    state = np.concatenate([cards_vector, [normalized_strength, pot_odds]])
 
-    # Encode cards into one-hot vectors
-    hole_cards_vector = cards_to_vector(hole_cards)
-    community_cards_vector = cards_to_vector(community_cards)
-
-    # Concatenate the final state
-    state = np.concatenate(
-        [hole_cards_vector, community_cards_vector, [hand_strength], [pot_odds]]
-    )
     return state
 
 
 def encode_action(action):
     """
-    Encodes an action (fold, call, raise) into a numerical label.
+    Encodes an action ("fold", "call", "raise") into a numerical label.
 
     Args:
         action (str): The action taken by the player.
 
     Returns:
-        int: Encoded action (0 for fold, 1 for call, 2 for raise).
+        int: Encoded action (0 for "fold", 1 for "call", 2 for "raise").
     """
     action_map = {"fold": 0, "call": 1, "raise": 2}
     if action not in action_map:
         raise ValueError(f"Unexpected action: {action}")
     return action_map[action]
-
-
-def cards_to_vector(cards):
-    """
-    Encodes a list of eval7.Card objects as a one-hot vector.
-    Args:
-        cards (list[eval7.Card]): List of eval7.Card objects.
-    Returns:
-        np.ndarray: A one-hot vector representing the cards.
-    """
-    ranks = "23456789TJQKA"  # Rank order
-    suits = ["s", "h", "d", "c"]  # Suit order mapped from integers
-    vector = np.zeros(52)  # 52 cards in a deck
-
-    for card in cards:
-        # Convert rank to string if it's an integer
-        rank = ranks[card.rank - 2] if isinstance(card.rank, int) else card.rank
-
-        # Convert suit to string if it's an integer
-        suit = suits[card.suit] if isinstance(card.suit, int) else card.suit
-
-        rank_index = ranks.index(rank)
-        suit_index = suits.index(suit)
-        card_index = rank_index * 4 + suit_index  # Unique index for each card
-        vector[card_index] = 1  # Set the corresponding position in the vector
-
-    return vector
-
-
-def validate_dataset(dataset):
-    logging.info("Validating dataset encodings...")
-    invalid_samples = []
-
-    for idx, (state, action_label, position, player_id, recent_action) in enumerate(
-        dataset
-    ):
-        try:
-            # Check state dimensions
-            expected_state_dim = 106  # Update if your state dimension changes
-            assert (
-                len(state) == expected_state_dim
-            ), f"Invalid state dimension at index {idx}: {len(state)}"
-
-            # Check valid action range
-            assert action_label in [
-                0,
-                1,
-                2,
-            ], f"Invalid action label at index {idx}: {action_label}"
-
-            # Check valid position range
-            max_positions = 10  # Update if needed
-            assert (
-                0 <= position < max_positions
-            ), f"Invalid position at index {idx}: {position}"
-
-            # Check valid player ID range
-            num_players = 6  # Update if needed
-            assert (
-                0 <= player_id < num_players
-            ), f"Invalid player ID at index {idx}: {player_id}"
-
-            # Check valid recent action range
-            assert recent_action in [
-                0,
-                1,
-                2,
-            ], f"Invalid recent action at index {idx}: {recent_action}"
-
-        except AssertionError as e:
-            logging.error(str(e))
-            invalid_samples.append(idx)
-
-    if invalid_samples:
-        logging.error(
-            f"Validation failed for {len(invalid_samples)} samples: {invalid_samples}"
-        )
-        raise ValueError(f"Dataset contains invalid encodings. See logs for details.")
-    else:
-        logging.info("Dataset validation passed. All encodings are valid.")
 
 
 def calculate_pot_odds(current_pot, bet_amount):
@@ -138,36 +108,12 @@ def calculate_pot_odds(current_pot, bet_amount):
     )
 
 
-# Utility methods for card serialization and deserialization
-def serialize_cards(cards):
-    """
-    Serialize a list of eval7.Card objects into strings.
-    Args:
-        cards (list[eval7.Card]): The cards to serialize.
-    Returns:
-        list[str]: Serialized card strings.
-    """
-    return [str(card) for card in cards]
-
-
-def deserialize_cards(cards_serialized):
-    """
-    Deserialize a list of strings into eval7.Card objects.
-    Args:
-        cards_serialized (list[str]): The serialized card strings.
-    Returns:
-        list[eval7.Card]: Deserialized eval7.Card objects.
-    """
-    return [eval7.Card(card) for card in cards_serialized]
-
-
 def calculate_cards_needed(community_cards, include_opponents, remaining_deck_size):
     """
     Calculate the number of cards needed based on community cards and opponent modeling.
-    Also logs debugging information and performs validation checks.
 
     Args:
-        community_cards (list[eval7.Card]): Current community cards.
+        community_cards (list[int]): Current community cards (Treys integer format).
         include_opponents (bool): Whether to include opponent modeling.
         remaining_deck_size (int): Number of cards remaining in the deck.
 
@@ -181,7 +127,7 @@ def calculate_cards_needed(community_cards, include_opponents, remaining_deck_si
         7 - len(community_cards) if include_opponents else 5 - len(community_cards)
     )
     logging.debug(
-        f"Cards needed: {cards_needed}, Community cards: {[str(card) for card in community_cards]}"
+        f"Cards needed: {cards_needed}, Community cards: {Card.print_pretty_cards(community_cards)}"
     )
 
     if remaining_deck_size < cards_needed:
@@ -200,53 +146,25 @@ def filter_remaining_deck(deck, excluded_cards):
     Filter the remaining deck after excluding specified cards.
 
     Args:
-        deck (eval7.Deck): The original deck.
-        excluded_cards (set[eval7.Card]): The set of cards to exclude.
+        deck (Deck): The original deck (Treys Deck object).
+        excluded_cards (list[int]): The list of cards to exclude (Treys integer format).
 
     Returns:
-        list[eval7.Card]: The remaining deck after exclusion.
-
-    Raises:
-        AssertionError: If the remaining deck size does not match expectations.
+        list[int]: The remaining deck after exclusion.
     """
-    # Convert excluded cards to eval7.Card for consistency
-    excluded_cards = {eval7.Card(str(card)) for card in excluded_cards}
-    logging.debug(f"Excluded Cards: {[str(card) for card in excluded_cards]}")
-    logging.debug(f"Deck Before Exclusion: {[str(card) for card in deck.cards]}")
+    # Ensure all excluded cards are integers
+    excluded_cards_set = set(excluded_cards)
+    logging.debug(f"Excluded Cards: {Card.print_pretty_cards(list(excluded_cards_set))}")
 
-    # Check if excluded cards are in the deck
-    remaining_excluded = [card for card in excluded_cards if card in deck.cards]
-    if len(remaining_excluded) < len(excluded_cards):
-        logging.warning(f"Some excluded cards were not in the deck: {[str(card) for card in excluded_cards if card not in deck.cards]}")
+    # Remove excluded cards from the deck
+    remaining_deck = [card for card in deck.cards if card not in excluded_cards_set]
 
-    # Filter the remaining deck
-    remaining_deck = [card for card in deck.cards if card not in remaining_excluded]
-
-    # Validate deck integrity
-    try:
-        assert len(deck.cards) == len(set(deck.cards)), f"Duplicates in deck: {deck.cards}"
-        assert len(remaining_deck) == len(deck.cards) - len(remaining_excluded), (
-            f"Mismatch: Remaining {len(remaining_deck)}, "
-            f"Expected {len(deck.cards) - len(remaining_excluded)}"
+    # Validation: Check for any missing cards
+    missing_cards = [card for card in excluded_cards_set if card not in deck.cards]
+    if missing_cards:
+        logging.warning(
+            f"Some excluded cards were not found in the deck: {Card.print_pretty_cards(missing_cards)}"
         )
-    except AssertionError as e:
-        logging.error(f"Assertion failed: {e}")
-        logging.debug(f"Remaining Deck: {[str(card) for card in remaining_deck]}")
-        raise
 
+    logging.debug(f"Deck After Filtering: {Card.print_pretty_cards(remaining_deck)}")
     return remaining_deck
-
-
-def deepcopy_sample_action(sample_action):
-    """
-    Custom deepcopy utility for sample actions that handles eval7.Card objects.
-    """
-    def copy_cards(cards):
-        # Create new instances of eval7.Card
-        return [eval7.Card(str(card)) for card in cards] if isinstance(cards, list) else cards
-
-    # Recreate the entire structure, ensuring cards are deeply copied
-    return {
-        key: copy_cards(value) if isinstance(value, list) and all(isinstance(card, eval7.Card) for card in value) else value
-        for key, value in sample_action.items()
-    }
