@@ -6,14 +6,12 @@ from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import f1_score
 from models.PokerLinformerModel import PokerLinformerModel
 from PokerDataset import PokerDataset
-from utils import validate_dataset
 
 
 # Function to load and validate dataset
 def load_dataset(data_path):
     try:
         dataset = PokerDataset(data_path)
-        validate_dataset(dataset)
         logging.info(f"Dataset loaded. Total samples: {len(dataset)}")
         if len(dataset) == 0:
             raise ValueError("Dataset is empty!")

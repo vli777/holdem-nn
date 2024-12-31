@@ -9,28 +9,37 @@ evaluator = Evaluator()
 def evaluate_hand(hole_cards, community_cards):
     """
     Evaluate the strength and type of a poker hand.
+    Treys evaluator requires 5+ cards
 
     Args:
         hole_cards (list[int]): Player's hole cards as Treys card integers.
         community_cards (list[int]): Community cards on the table as Treys card integers.
 
     Returns:
-        tuple: (hand_strength (int), hand_type (str))
+        int: hand_strength
     """
-    evaluator = Evaluator()
-    hand_strength = evaluator.evaluate(community_cards, hole_cards)
-    normalized_strength = 1 - (hand_strength / 7462.0)  # Normalize strength (0-1)
-    return normalized_strength
+    total_cards = hole_cards + community_cards
+
+    if len(total_cards) < 5:
+        return 0.0
+
+    try:
+        hand_strength = evaluator.evaluate(community_cards, hole_cards)
+        normalized_strength = 1 - (hand_strength / 7462.0)
+        return normalized_strength
+    except KeyError as e:
+        logging.error(f"KeyError while evaluating hand: {e}")
+        raise ValueError(f"Invalid card encountered: {e}") from e
 
 
 def decide_action(
-    hand_strength, pot_odds, bluffing_probability, player_type="balanced"
+    normalized_hand_strength, pot_odds, bluffing_probability, player_type="balanced"
 ):
     """
-    Decide an action based on hand strength, pot odds, and bluffing.
+    Decide an action based on normalized hand strength, pot odds, and bluffing.
 
     Args:
-        hand_strength (int): Treys hand strength (1-7462).
+        normalized_hand_strength (float): Normalized hand strength (0-1).
         pot_odds (float): Current pot odds (0-1).
         bluffing_probability (float): Chance of bluffing.
         player_type (str): Type of player strategy (e.g., "tight-aggressive", "loose-passive", "balanced").
@@ -38,46 +47,40 @@ def decide_action(
     Returns:
         str: Action ("fold", "call", "raise").
     """
-    # Normalize hand strength (lower is better in Treys)
-    normalized_strength = 1 - (hand_strength / 7462.0)
-
     if player_type == "tight-aggressive":
-        if normalized_strength > pot_odds:
+        if normalized_hand_strength > pot_odds:
             return "raise" if random.random() > 0.3 else "call"
         return "fold"
     elif player_type == "loose-passive":
         if random.random() < bluffing_probability:
             return "call"
-        return "fold" if normalized_strength < 0.2 else "call"
+        return "fold" if normalized_hand_strength < 0.2 else "call"
     else:  # Balanced player
         if random.random() < bluffing_probability:
             return "raise" if random.random() > 0.5 else "call"
-        if normalized_strength > pot_odds:
+        if normalized_hand_strength > pot_odds:
             return "raise" if random.random() > 0.7 else "call"
-        elif normalized_strength > 0.3:
+        elif normalized_hand_strength > 0.3:
             return "call"
         return "fold"
 
 
-def encode_state(hole_cards, community_cards, hand_strength, pot_odds):
+def encode_state(hole_cards, community_cards, normalized_hand_strength, pot_odds):
     """
     Encodes the player's state as a feature vector, optimized for opponent modeling.
 
     Args:
         hole_cards (list[int]): The player's hole cards (Treys integer format).
         community_cards (list[int]): The shared community cards (Treys integer format).
-        hand_strength (int): Treys hand strength (1-7462).
+        normalized_hand_strength (float): Hand strength (normalized to [0, 1]).
         pot_odds (float): The current pot odds (normalized to [0, 1]).
 
     Returns:
         np.ndarray: A feature vector representing the player's state.
     """
-    # Normalize hand strength (1 is best, 0 is worst)
-    normalized_strength = 1 - (hand_strength / 7462.0)
-
     # Combine cards and numerical features
     cards_vector = np.array(hole_cards + community_cards, dtype=np.float32)
-    state = np.concatenate([cards_vector, [normalized_strength, pot_odds]])
+    state = np.concatenate([cards_vector, [normalized_hand_strength, pot_odds]])
 
     return state
 

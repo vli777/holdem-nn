@@ -7,15 +7,16 @@ def determine_optimal_action(player_strength, max_opponent_strength):
     Determine the optimal action based on the player's and opponent's hand strengths.
 
     Args:
-        player_strength (int): The strength of the player's hand (lower is better).
-        max_opponent_strength (int): The maximum strength of the opponents' hands (lower is better).
+        player_strength (float): The normalized strength of the player's hand (0 is worst, 1 is best).
+        max_opponent_strength (float): The normalized strength of the opponents' hands (0 is worst, 1 is best).
 
     Returns:
         str: The optimal action ("fold", "call", or "raise").
     """
-    if player_strength > 4000 and player_strength > max_opponent_strength:
+    # Thresholds should now work on a normalized scale
+    if player_strength < 0.5 and player_strength < max_opponent_strength:
         return "fold"
-    elif player_strength < max_opponent_strength:
+    elif player_strength > max_opponent_strength:
         return "raise"
     else:
         return "call"

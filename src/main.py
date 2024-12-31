@@ -116,7 +116,8 @@ def predict_action(
         # Calculate hand strength using Treys Evaluator
         logging.info("Calculating hand strength using Treys...")
         hand_strength = evaluator.evaluate(hole_cards, community_cards)
-        logging.info(f"Hand strength calculated: {hand_strength}")
+        normalized_hand_strength = 1 - (hand_strength / 7462.0)  # Normalize (0-1)
+        logging.info(f"Normalized hand strength: {normalized_hand_strength:.4f}")
 
         # Calculate pot odds
         logging.info("Calculating pot odds...")
@@ -127,7 +128,7 @@ def predict_action(
         sample_action = {
             "hole_cards": hole_cards,
             "community_cards": community_cards,
-            "hand_strength": hand_strength,
+            "hand_strength": normalized_hand_strength,  # Use only normalized strength
             "pot_odds": pot_odds,
         }
         logging.info(f"Sample action prepared: {sample_action}")
