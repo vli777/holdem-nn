@@ -1,7 +1,10 @@
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationError
+from pydantic_settings import BaseSettings
+import logging
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv(".env")
 
 class Settings(BaseSettings):
     # General Configurations
@@ -20,15 +23,18 @@ class Settings(BaseSettings):
     data_path: Path = Path("data/poker_dataset.h5")
     debug: bool = False
 
-    # Configuration for Settings
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-    )
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
+config = Settings()
 
-try:
-    config = Settings()
-except ValidationError as e:
-    print("Configuration validation error:", e)
-    exit(1)
+# Ensure necessary directories exist
+config.model_path.parent.mkdir(parents=True, exist_ok=True)
+config.data_path.parent.mkdir(parents=True, exist_ok=True)
+
+# Adjust logging based on debug mode
+logging.basicConfig(
+    level=logging.DEBUG if config.debug else logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)

@@ -14,7 +14,7 @@ logging.basicConfig(
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "saved_models"
-FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
+FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pt"
 
 
 def initialize_models(

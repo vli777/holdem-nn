@@ -128,7 +128,7 @@ def k_fold_cross_validation(
                 patience_counter = 0
                 torch.save(
                     model.state_dict(),
-                    f"{model_save_dir}/best_model_fold{fold + 1}.pth",
+                    f"{model_save_dir}/best_model_fold{fold + 1}.pt",
                 )
                 logging.info(f"New best model saved for Fold {fold + 1}")
             else:
