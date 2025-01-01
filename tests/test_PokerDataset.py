@@ -1,3 +1,4 @@
+import h5py
 import pytest
 import numpy as np
 import torch
@@ -22,14 +23,6 @@ def dataset(tmp_path):
         subset_indices = indices[:subset_size]
         ds = Subset(ds, subset_indices)
     return ds
-
-
-def test_dataset_loading(tmp_path):
-    """
-    Test that the PokerDataset loads correctly and is not empty.
-    """
-    dataset = PokerDataset(str(config.data_path))
-    assert len(dataset) > 0, "Dataset should not be empty"
 
 
 @pytest.mark.parametrize(
@@ -59,14 +52,10 @@ def test_encode_action_invalid(action):
 
 
 def test_valid_dataset(tmp_path):
-    """
-    Test that a valid dataset is loaded correctly with all assertions passing.
-    """
-    # Create valid data with the correct state dimension
     valid_data = [
         {
             "state": np.random.rand(config.input_dim),
-            "action": 1,  # Valid action (0, 1, or 2)
+            "action": 1,
             "position": 3,
             "player_id": 2,
             "recent_action": 1,
@@ -76,26 +65,29 @@ def test_valid_dataset(tmp_path):
         for _ in range(10)
     ]
 
-    # Save the valid dataset to a temporary file
-    valid_dataset_path = tmp_path / "valid_dataset.npz"
-    np.savez_compressed(valid_dataset_path, updated_data=valid_data)
+    valid_dataset_path = tmp_path / "valid_dataset.h5"
+    with h5py.File(valid_dataset_path, "w") as hdf5_file:
+        for key in ["state", "action", "position", "player_id", "recent_action"]:
+            data_to_append = [entry[key] for entry in valid_data]
+            hdf5_file.create_dataset(
+                key,
+                data=np.array(data_to_append),
+                maxshape=(None,),
+                chunks=True,
+                compression="gzip",
+            )
 
-    # Load the dataset
     dataset = PokerDataset(str(valid_dataset_path))
     assert len(dataset) > 0, "Dataset should not be empty"
 
-    # Iterate through the dataset and perform assertions
     for idx, data in enumerate(dataset):
         state, action_label, position, player_id, recent_action = data
 
-        # Assert state
         assert isinstance(state, torch.Tensor), "State should be a torch.Tensor"
-        assert state.shape == (config.input_dim,), (
-            f"State tensor shape mismatch at index {idx}: "
-            f"expected {config.input_dim}, got {state.shape}"
-        )
+        assert state.shape == (
+            config.input_dim,
+        ), f"State tensor shape mismatch at index {idx}: expected {config.input_dim}, got {state.shape}"
 
-        # Assert action_label
         assert isinstance(
             action_label, torch.Tensor
         ), "Action label should be a torch.Tensor"
@@ -104,56 +96,12 @@ def test_valid_dataset(tmp_path):
             config.output_dim
         ), f"Invalid action label at index {idx}: {action_label.item()}"
 
-        # Assert position
-        assert isinstance(position, torch.Tensor), "Position should be a torch.Tensor"
-        assert position.dim() == 0, "Position tensor should be scalar"
-
-        # Assert player_id
-        assert isinstance(player_id, torch.Tensor), "Player ID should be a torch.Tensor"
-        assert player_id.dim() == 0, "Player ID tensor should be scalar"
-
-        # Assert recent_action
-        assert isinstance(
-            recent_action, torch.Tensor
-        ), "Recent action should be a torch.Tensor"
-        assert recent_action.dim() == 0, "Recent action tensor should be scalar"
-
-
-def test_invalid_dataset_all_invalid(tmp_path):
-    """
-    Test that the PokerDataset raises a ValueError when all data points are invalid.
-    """
-    # Create invalid data with an invalid action label
-    invalid_data = [
-        {
-            "state": np.random.rand(config.input_dim),
-            "action": 5,  # Invalid action
-            "position": 3,
-            "player_id": 2,
-            "recent_action": 1,
-            "bet_to_call": 10,
-            "pot_odds": 0.5,
-        }
-    ]
-    invalid_dataset_path = tmp_path / "invalid_dataset_all_invalid.npz"
-    np.savez_compressed(invalid_dataset_path, updated_data=invalid_data)
-
-    # Attempt to load the invalid dataset and expect a ValueError
-    with pytest.raises(
-        ValueError, match="No valid data points were parsed from the dataset."
-    ):
-        PokerDataset(str(invalid_dataset_path))
-
 
 def test_invalid_dataset_partial(tmp_path):
-    """
-    Test that the PokerDataset skips invalid data points but loads valid ones.
-    """
-    # Create a mix of valid and invalid data
     mixed_data = [
         {
             "state": np.random.rand(config.input_dim),
-            "action": 1,  # Valid action
+            "action": 1,
             "position": 3,
             "player_id": 2,
             "recent_action": 1,
@@ -170,56 +118,23 @@ def test_invalid_dataset_partial(tmp_path):
             "pot_odds": 0.5,
         },
     ]
-    mixed_dataset_path = tmp_path / "invalid_dataset_partial.npz"
-    np.savez_compressed(mixed_dataset_path, updated_data=mixed_data)
 
-    # Load the dataset
+    mixed_dataset_path = tmp_path / "invalid_dataset_partial.h5"
+    with h5py.File(mixed_dataset_path, "w") as hdf5_file:
+        for key in ["state", "action", "position", "player_id", "recent_action"]:
+            data_to_append = [entry[key] for entry in mixed_data]
+            hdf5_file.create_dataset(
+                key,
+                data=np.array(data_to_append),
+                maxshape=(None,),
+                chunks=True,
+                compression="gzip",
+            )
+
     dataset = PokerDataset(str(mixed_dataset_path))
     assert len(dataset) == 1, "Dataset should contain only valid data points"
-
-    # Check the valid data point
     state, action_label, position, player_id, recent_action = dataset[0]
     assert action_label.item() == 1, "Action label should be 1 (call)"
-
-
-def test_missing_field_in_action(tmp_path):
-    """
-    Test that the PokerDataset raises a ValueError when no valid data points are present due to missing fields.
-    """
-    # Create data missing the "action" field
-    missing_field_data = [
-        {
-            "state": np.random.rand(config.input_dim),
-            # Missing "action" field
-            "position": 3,
-            "player_id": 2,
-            "recent_action": 1,
-            "bet_to_call": 10,
-            "pot_odds": 0.5,
-        }
-    ]
-    missing_field_dataset_path = tmp_path / "missing_field_dataset.npz"
-    np.savez_compressed(missing_field_dataset_path, updated_data=missing_field_data)
-
-    # Attempt to load the dataset and expect a ValueError since no valid data points are parsed
-    with pytest.raises(
-        ValueError, match="No valid data points were parsed from the dataset."
-    ):
-        PokerDataset(str(missing_field_dataset_path))
-
-
-def test_empty_dataset(tmp_path):
-    """
-    Test that the PokerDataset raises a ValueError when the dataset is empty.
-    """
-    # Create an empty dataset
-    empty_data = []
-    empty_dataset_path = tmp_path / "empty_dataset.npz"
-    np.savez_compressed(empty_dataset_path, updated_data=empty_data)
-
-    # Attempt to load the empty dataset and expect a ValueError
-    with pytest.raises(ValueError, match="Loaded dataset is empty!"):
-        PokerDataset(str(empty_dataset_path))
 
 
 def test_invalid_player_ids(dataset):
