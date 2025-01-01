@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 from pathlib import Path
 import logging
 
+from config import config
+
 
 class PokerDataset(Dataset):
     def __init__(self, data_path):
@@ -19,7 +21,18 @@ class PokerDataset(Dataset):
             self.player_id = self.hdf5_file["player_id"]
             self.recent_action = self.hdf5_file["recent_action"]
 
-            self.length = self.state.shape[0]
+            valid_indices = [
+                i
+                for i in range(len(self.action))
+                if 0 <= self.action[i] < config.output_dim
+            ]
+            self.state = self.state[valid_indices]
+            self.action = self.action[valid_indices]
+            self.position = self.position[valid_indices]
+            self.player_id = self.player_id[valid_indices]
+            self.recent_action = self.recent_action[valid_indices]
+
+            self.length = len(valid_indices)
 
             if self.length == 0:
                 raise ValueError("Loaded dataset is empty!")
@@ -51,8 +64,6 @@ class PokerDataset(Dataset):
     def close(self):
         if self.hdf5_file:
             self.hdf5_file.close()
-            self.hdf5_file = None
-            self.logger.info("HDF5 file closed.")
 
     def __del__(self):
         self.close()

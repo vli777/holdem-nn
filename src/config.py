@@ -2,6 +2,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 import logging
 
+
 class Settings(BaseSettings):
     learning_rate: float = 1e-3
     batch_size: int = 32
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         frozen = True  # Make settings immutable
 
+
 # Initialize config
 config = Settings()
 
@@ -34,11 +36,13 @@ config.data_path.parent.mkdir(parents=True, exist_ok=True)
 assert config.data_path.suffix == ".h5", "data_path must be an HDF5 file"
 assert config.model_path.suffix == ".pt", "model_path must be a PyTorch model file"
 
+
 # Setup logging
 def setup_logging(debug: bool):
     logging.basicConfig(
         level=logging.DEBUG if debug else logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
+
 
 setup_logging(config.debug)

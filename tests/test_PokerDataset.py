@@ -69,13 +69,25 @@ def test_valid_dataset(tmp_path):
     with h5py.File(valid_dataset_path, "w") as hdf5_file:
         for key in ["state", "action", "position", "player_id", "recent_action"]:
             data_to_append = [entry[key] for entry in valid_data]
-            hdf5_file.create_dataset(
-                key,
-                data=np.array(data_to_append),
-                maxshape=(None,),
-                chunks=True,
-                compression="gzip",
-            )
+            data_to_append = np.array(data_to_append)
+
+            # Adjust the maxshape and shape based on rank
+            if key == "state":
+                hdf5_file.create_dataset(
+                    key,
+                    data=data_to_append,
+                    maxshape=(None, config.input_dim),  # Match rank of `data_to_append`
+                    chunks=(1, config.input_dim),  # Chunk size must also match rank
+                    compression="gzip",
+                )
+            else:
+                hdf5_file.create_dataset(
+                    key,
+                    data=data_to_append,
+                    maxshape=(None,),  # 1D for scalar values
+                    chunks=(1,),
+                    compression="gzip",
+                )
 
     dataset = PokerDataset(str(valid_dataset_path))
     assert len(dataset) > 0, "Dataset should not be empty"
@@ -98,35 +110,38 @@ def test_valid_dataset(tmp_path):
 
 
 def test_invalid_dataset_partial(tmp_path):
+    """
+    Test that the PokerDataset skips invalid data points but loads valid ones.
+    """
     mixed_data = [
         {
-            "state": np.random.rand(config.input_dim),
-            "action": 1,
+            "state": np.random.rand(config.input_dim).astype("float32"),
+            "action": 1,  # Valid action
             "position": 3,
             "player_id": 2,
             "recent_action": 1,
-            "bet_to_call": 10,
-            "pot_odds": 0.5,
         },
         {
-            "state": np.random.rand(config.input_dim),
+            "state": np.random.rand(config.input_dim).astype("float32"),
             "action": 5,  # Invalid action
             "position": 3,
             "player_id": 2,
             "recent_action": 1,
-            "bet_to_call": 10,
-            "pot_odds": 0.5,
         },
     ]
 
     mixed_dataset_path = tmp_path / "invalid_dataset_partial.h5"
     with h5py.File(mixed_dataset_path, "w") as hdf5_file:
         for key in ["state", "action", "position", "player_id", "recent_action"]:
-            data_to_append = [entry[key] for entry in mixed_data]
+            data_to_append = np.array([entry[key] for entry in mixed_data])
             hdf5_file.create_dataset(
                 key,
-                data=np.array(data_to_append),
-                maxshape=(None,),
+                data=data_to_append,
+                maxshape=(
+                    (None,) + data_to_append.shape[1:]
+                    if len(data_to_append.shape) > 1
+                    else (None,)
+                ),
                 chunks=True,
                 compression="gzip",
             )
