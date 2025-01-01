@@ -89,27 +89,34 @@ def k_fold_cross_validation(
         list: Results for each fold (train loss, validation loss, accuracy).
     """
     os.makedirs(model_save_dir, exist_ok=True)  # Ensure the directory exists
+
+    # Extract labels for stratified splitting
+    labels = [
+        dataset[i][1].item() for i in range(len(dataset))
+    ]  # Assuming action is at index 1
+
     kfold = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
 
     fold_results = []
     patience_limit = 3  # Set a threshold for stopping
 
     for fold, (train_indices, val_indices) in enumerate(
-        # (fold, call, raise)
-        kfold.split(dataset.data, dataset.labels)
+        kfold.split(range(len(dataset)), labels)
     ):
         logging.info(f"Fold {fold + 1}/{k}")
 
+        # Create subsets for the current fold
         train_subset = Subset(dataset, train_indices)
         val_subset = Subset(dataset, val_indices)
 
         train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
+        # Initialize model and optimizer
         model = model_class(**model_params).to(device)
         optimizer = optimizer_class(model.parameters(), **optimizer_params)
 
-        # Reset early stopping vars
+        # Reset early stopping variables
         best_val_loss = float("inf")
         patience_counter = 0
 
@@ -128,7 +135,7 @@ def k_fold_cross_validation(
                 patience_counter = 0
                 torch.save(
                     model.state_dict(),
-                    f"{model_save_dir}/best_model_fold{fold + 1}.pth",
+                    f"{model_save_dir}/best_model_fold{fold + 1}.pt",
                 )
                 logging.info(f"New best model saved for Fold {fold + 1}")
             else:

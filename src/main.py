@@ -35,8 +35,8 @@ app.add_middleware(
 # Directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "saved_models"
-FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pth"
-ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pth" for i in range(1, 6)]
+FULL_MODEL_PATH = MODEL_DIR / "poker_model_full.pt"
+ENSEMBLE_MODEL_PATHS = [MODEL_DIR / f"best_model_fold{i}.pt" for i in range(1, 6)]
 
 # Model parameters
 input_dim = 2

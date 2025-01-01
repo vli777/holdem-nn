@@ -1,5 +1,6 @@
 import logging
 import random
+import config
 from training.player_state import PlayerState
 from treys import Deck
 
@@ -270,7 +271,10 @@ class TexasHoldemGame:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.DEBUG if config.debug else logging.WARNING,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
     game = TexasHoldemGame(num_players=6)
     game.play_hand()
 
