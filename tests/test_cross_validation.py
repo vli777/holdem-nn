@@ -48,8 +48,8 @@ def setup_hdf5_mock_data(config):
         {
             "state": np.random.rand(config["state_dim"]).astype("float32"),
             "action": np.random.randint(0, config["output_dim"]),
-            "position": np.random.randint(0, 6),  # Assuming 6 possible positions
-            "player_id": np.random.randint(1000, 2000),
+            "position": np.random.randint(0, 6),
+            "player_id": np.random.randint(0, 6),  # Ensure valid range
             "recent_action": np.random.randint(0, 3),
         }
         for _ in range(100)
@@ -71,7 +71,7 @@ def setup_mock_data(setup_hdf5_mock_data):
     dataset = PokerDataset(data_path)
 
     model_params = {
-        "input_dim": config["state_dim"] + 6,
+        "input_dim": config["state_dim"],
         "hidden_dim": config["hidden_dim"],
         "output_dim": config["output_dim"],
         "seq_len": config["seq_len"],
