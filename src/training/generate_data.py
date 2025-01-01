@@ -3,6 +3,7 @@ import numpy as np
 import os
 import time
 from multiprocessing import Pool
+from config import config
 from training.texas_holdem_game import TexasHoldemGame
 
 import logging
@@ -19,7 +20,6 @@ def run_simulation(num_players: int, num_hands: int) -> list:
     """
     game_data = []
 
-    # Create the game instance (your OOP version)
     game = TexasHoldemGame(num_players=num_players, starting_chips=1000)
 
     # Play multiple hands
@@ -53,7 +53,7 @@ def simulate_games_for_worker(args):
 
 def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) -> list:
     """
-    Parallel simulation of Texas Hold'em games using the OOP approach.
+    Parallel simulation of Texas Hold'em games
     """
     num_workers = os.cpu_count()
     base_games_per_worker = num_games // num_workers
@@ -65,7 +65,7 @@ def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) 
         worker_games = base_games_per_worker + (1 if worker_id < remainder else 0)
         args.append((num_players, worker_games, worker_id))
 
-    logging.info("Starting parallel game simulation (OOP)...")
+    logging.info("Starting parallel game simulation ...")
     with Pool(processes=num_workers) as pool:
         results = pool.map(simulate_games_for_worker, args)
 
@@ -104,10 +104,7 @@ if __name__ == "__main__":
 
     game_data = simulate_texas_holdem_parallel(num_players=6, num_games=100000)
 
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    DATA_PATH = os.path.join(BASE_DIR, "data", "texas_holdem_data.npz")
-
-    append_simulation_data(DATA_PATH, game_data)
+    append_simulation_data(config.data_path, game_data)
 
     elapsed_time = time.time() - start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds")
