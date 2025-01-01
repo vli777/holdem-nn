@@ -15,8 +15,9 @@ class Settings(BaseSettings):
     num_epochs: int = 10
     early_stop_limit: int = 5
     input_dim: int = 4
-    model_path: Path = Path("saved_models/poker_model_full.pth")
-    data_path: Path = Path("data/texas_holdem_data.npz")
+    state_dim: int = 10
+    model_path: Path = Path("saved_models/poker_model_full.pt")
+    data_path: Path = Path("data/poker_dataset.h5")
     debug: bool = False
 
     # Configuration for Settings
