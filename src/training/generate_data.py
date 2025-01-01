@@ -64,7 +64,8 @@ def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) 
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+        level=logging.DEBUG if config.debug else logging.WARNING,
+        format="%(asctime)s - %(levelname)s - %(message)s",
     )
     start_time = time.time()
 

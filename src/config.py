@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv(".env")
 
+
 class Settings(BaseSettings):
     # General Configurations
     learning_rate: float = 1e-3
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+
 
 config = Settings()
 
