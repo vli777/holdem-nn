@@ -77,9 +77,9 @@ if __name__ == "__main__":
         logging.info(
             f"{config.data_path} does not exist. Initializing a new HDF5 file."
         )
-        initialize_hdf5(config.data_path, state_dim=10, initial_size=0)
+        initialize_hdf5(config.data_path, state_dim=config.state_dim, initial_size=0)
 
-    append_to_hdf5(config.data_path, game_data, state_dim=10)
+    append_to_hdf5(config.data_path, game_data, state_dim=config.state_dim)
 
     elapsed_time = time.time() - start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds")
