@@ -3,7 +3,7 @@ import os
 import time
 from multiprocessing import Pool
 from config import config
-from training.utils import save_game_sequences_to_hdf5
+from training.hdf5 import save_to_hdf5
 from training.texas_holdem_game import TexasHoldemGame
 
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         num_players=NUM_PLAYERS, num_hands=NUM_HANDS
     )
 
-    save_game_sequences_to_hdf5(DATA_PATH, game_sequences)
+    save_to_hdf5(DATA_PATH, game_sequences)
 
     elapsed_time = time.time() - start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds")

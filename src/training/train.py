@@ -23,9 +23,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from PokerSequenceDataset import PokerSequenceDataset, poker_collate_fn
 from models import PokerTransformerModel
-from training.utils import initialize_hdf5
 from config import Settings, config
-from training.utils import get_class_weights
+from training.hdf5 import initialize_hdf5
+from training.train_utils import get_class_weights
 
 
 # Optional: Set a seed for reproducibility

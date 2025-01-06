@@ -1,29 +1,48 @@
 import os
 import h5py
 import logging
-import torch
 import numpy as np
 import uuid
-from sklearn.utils.class_weight import compute_class_weight
 
 
-def get_class_weights(actions, num_classes):
+def initialize_hdf5(
+    file_path, state_dim, initial_size=0, chunk_size=1000, compression="gzip"
+):
     """
-    Compute class weights to handle class imbalance.
+    Initialize an HDF5 file with a dataset prepared for incremental writes.
 
     Args:
-        actions (list or np.array): Array of action labels.
-        num_classes (int): Number of classes.
-
-    Returns:
-        torch.Tensor: Class weights tensor.
+        file_path (str): Path to create the HDF5 file.
+        state_dim (int): The dimensionality of the state vector.
+        initial_size (int): Initial size of the dataset (number of samples).
+        chunk_size (int): Size of chunks for efficient storage.
+        compression (str): Compression method for HDF5 (e.g., 'gzip', 'lzf').
     """
-    classes = np.arange(num_classes)
-    class_weights = compute_class_weight("balanced", classes=classes, y=actions)
-    return torch.tensor(class_weights, dtype=torch.float32)
+    try:
+        with h5py.File(file_path, "w") as f:
+            f.create_dataset(
+                "states",
+                shape=(initial_size, state_dim),
+                maxshape=(None, state_dim),
+                chunks=(chunk_size, state_dim),
+                compression=compression,
+            )
+            f.create_dataset(
+                "labels",
+                shape=(initial_size,),
+                maxshape=(None,),
+                chunks=(chunk_size,),
+                compression=compression,
+            )
+        logging.info(
+            f"Initialized HDF5 file at {file_path} with state_dim={state_dim}."
+        )
+    except Exception as e:
+        logging.error(f"Failed to initialize HDF5 file at {file_path}: {e}")
+        raise
 
 
-def save_game_sequences_to_hdf5(hdf5_path, game_sequences):
+def save_to_hdf5(hdf5_path, game_sequences):
     """
     Save game-level sequences to the HDF5 file in a structured manner.
 
