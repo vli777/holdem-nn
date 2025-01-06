@@ -79,7 +79,7 @@ if __name__ == "__main__":
     DATA_PATH = config.data_path
 
     game_sequences = simulate_texas_holdem_parallel(
-        num_players=NUM_PLAYERS, num_hands=NUM_HANDS
+        num_players=NUM_PLAYERS, num_games=NUM_HANDS
     )
 
     save_to_hdf5(DATA_PATH, game_sequences)

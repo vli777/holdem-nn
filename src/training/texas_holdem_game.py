@@ -71,10 +71,10 @@ class TexasHoldemGame:
         bb_player.current_bet = bb
 
         self.current_pot = sb + bb
-        
+
         logging.info(f"Player {sb_player.player_id} posts small blind of {sb}.")
         logging.info(f"Player {bb_player.player_id} posts big blind of {bb}.")
-        
+
     def rotate_positions(self):
         """Rotate player positions clockwise."""
         first_player = self.players.pop(0)
@@ -142,7 +142,9 @@ class TexasHoldemGame:
                 pot_odds=pot_odds,
                 player_id=p.player_id,
                 position=p.position,
-                recent_action=encode_action(previous_action) if previous_action else 0,  # Default if no previous action
+                recent_action=(
+                    encode_action(previous_action) if previous_action else 0
+                ),  # Default if no previous action
                 strategy=p.strategy,
                 bluffing_probability=p.bluffing_probability,
             )
@@ -153,18 +155,22 @@ class TexasHoldemGame:
                     "action": encoded_act,
                     "player_id": p.player_id,
                     "position": p.position,
-                    "recent_action": encode_action(previous_action) if previous_action else 0,
+                    "recent_action": (
+                        encode_action(previous_action) if previous_action else 0
+                    ),
                 }
             )
-            
+
             if p.chips == 0 and (action_str == "call" or action_str == "raise"):
-                logging.info(f"Player {p.player_id} has gone all-in with a bet of {p.current_bet}.")
+                logging.info(
+                    f"Player {p.player_id} has gone all-in with a bet of {p.current_bet}."
+                )
 
             self.handle_side_pots()
-            
+
         # Return True if a raise occurred, else False
         return action_happened
-    
+
     def handle_side_pots(self):
         """
         Handle side pots based on players' all-in statuses.
@@ -184,7 +190,9 @@ class TexasHoldemGame:
             amount = p.current_bet
 
             # Eligible players are those who have bet at least this amount
-            eligible_players = [player for player in self.players if player.current_bet >= amount]
+            eligible_players = [
+                player for player in self.players if player.current_bet >= amount
+            ]
 
             # Create a side pot
             side_pot = (amount * len(eligible_players), eligible_players.copy())
@@ -199,7 +207,9 @@ class TexasHoldemGame:
             # Reduce the main pot
             self.current_pot -= side_pot[0]
 
-            logging.info(f"Created a side pot of {side_pot[0]} with players {[p.player_id for p in eligible_players]}.")
+            logging.info(
+                f"Created a side pot of {side_pot[0]} with players {[p.player_id for p in eligible_players]}."
+            )
 
     def multi_betting_round(self, round_name="pre-flop"):
         """
@@ -338,7 +348,9 @@ class TexasHoldemGame:
                 for w in winners:
                     w.chips += split_pot
                 winner_ids = [w.player_id for w in winners]
-                logging.info(f"{pot_name.capitalize()} of {pot_amount} won by Player(s) {winner_ids}.")
+                logging.info(
+                    f"{pot_name.capitalize()} of {pot_amount} won by Player(s) {winner_ids}."
+                )
 
         # Reset the main pot and side pots
         self.current_pot = 0
@@ -366,8 +378,8 @@ if __name__ == "__main__":
     game = TexasHoldemGame(num_players=config.num_players)
     game.play_hand()
 
-    final_data = game.get_game_data()    
+    final_data = game.get_game_data()
     logging.info(f"Collected {len(final_data)} state-action records from the hand.")
-    
-    game.game_data = [] 
+
+    game.game_data = []
     game.rotate_positions()

@@ -92,14 +92,12 @@ def encode_state(
         list: Encoded state features.
     """
     base_features = hole_cards + community_cards + [normalized_strength, pot_odds]
-    
+
     # Convert strategy to numerical encoding
-    strategy_mapping = {
-        "tight-aggressive": 0,
-        "loose-passive": 1,
-        "balanced": 2
-    }
-    strategy_encoded = strategy_mapping.get(strategy, 2)  # Default to 'balanced' if unknown
+    strategy_mapping = {"tight-aggressive": 0, "loose-passive": 1, "balanced": 2}
+    strategy_encoded = strategy_mapping.get(
+        strategy, 2
+    )  # Default to 'balanced' if unknown
 
     encoded = base_features + [
         player_id,
