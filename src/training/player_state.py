@@ -17,6 +17,7 @@ class PlayerState:
         self.hole_cards = []
         self.current_bet = 0
         self.last_action = None  # e.g. "fold", "call", "raise"
+        self.position = player_id
         self.opponent_behavior = OpponentBehavior(
             strategy=strategy, bluffing_probability=bluffing_probability
         )

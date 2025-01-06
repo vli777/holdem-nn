@@ -1,6 +1,6 @@
 import logging
 import random
-import config
+from config import config
 from training.player_state import PlayerState
 from treys import Deck
 
@@ -37,6 +37,7 @@ class TexasHoldemGame:
 
         # For storing states/actions, etc.
         self.game_data = []  # Will hold the final state-action records
+        self.side_pots = []  # List of tuples: (pot_amount, eligible_players)
 
     def reset_for_new_hand(self):
         """Reset or re-init fields for a new hand."""
@@ -44,6 +45,7 @@ class TexasHoldemGame:
         self.deck.shuffle()
         self.community_cards = []
         self.current_pot = 0
+        self.side_pots = []
         for p in self.players:
             p.reset_for_new_hand()
 
@@ -57,17 +59,28 @@ class TexasHoldemGame:
         if self.num_players < 2:
             return
 
-        # Player 0 posts small blind
-        sb = min(self.players[0].chips, 1)
-        self.players[0].chips -= sb
-        self.players[0].current_bet = sb
+        sb_player = self.players[0]  # Small blind is first player after dealer
+        bb_player = self.players[1]  # Big blind is next player
 
-        # Player 1 posts big blind
-        bb = min(self.players[1].chips, 2)
-        self.players[1].chips -= bb
-        self.players[1].current_bet = bb
+        sb = min(sb_player.chips, 1)
+        sb_player.chips -= sb
+        sb_player.current_bet = sb
+
+        bb = min(bb_player.chips, 2)
+        bb_player.chips -= bb
+        bb_player.current_bet = bb
 
         self.current_pot = sb + bb
+        
+        logging.info(f"Player {sb_player.player_id} posts small blind of {sb}.")
+        logging.info(f"Player {bb_player.player_id} posts big blind of {bb}.")
+        
+    def rotate_positions(self):
+        """Rotate player positions clockwise."""
+        first_player = self.players.pop(0)
+        self.players.append(first_player)
+        for idx, player in enumerate(self.players):
+            player.position = idx
 
     def single_pass_betting_round(self, round_name="pre-flop"):
         """
@@ -84,8 +97,7 @@ class TexasHoldemGame:
                 continue
 
             bet_to_call = current_highest_bet - p.current_bet
-            if bet_to_call < 0:
-                bet_to_call = 0
+            bet_to_call = max(bet_to_call, 0)
 
             # Evaluate the player's hand strength, pot odds, etc.
             normalized_strength = evaluate_hand(p.hole_cards, self.community_cards)
@@ -94,9 +106,10 @@ class TexasHoldemGame:
             action_str = p.opponent_behavior.decide_action(
                 hand_strength=normalized_strength,
                 pot_odds=pot_odds,
-                position=p.player_id,
+                position=p.position,
             )
 
+            previous_action = p.last_action
             p.last_action = action_str
 
             if action_str == "fold":
@@ -108,6 +121,8 @@ class TexasHoldemGame:
                 p.current_bet += call_amount
                 self.current_pot += call_amount
                 logging.info(f"Player {p.player_id} calls {call_amount}.")
+                if p.chips == 0:
+                    logging.info(f"Player {p.player_id} is all-in.")
             elif action_str == "raise":
                 raise_amount = bet_to_call + self.minimum_raise
                 raise_amount = min(p.chips, raise_amount)
@@ -117,9 +132,19 @@ class TexasHoldemGame:
                 current_highest_bet = p.current_bet
                 action_happened = True
                 logging.info(f"Player {p.player_id} raises to {p.current_bet}.")
+                if p.chips == 0:
+                    logging.info(f"Player {p.player_id} is all-in.")
 
             encoded_state = encode_state(
-                p.hole_cards, self.community_cards, normalized_strength, pot_odds
+                hole_cards=p.hole_cards,
+                community_cards=self.community_cards,
+                normalized_strength=normalized_strength,
+                pot_odds=pot_odds,
+                player_id=p.player_id,
+                position=p.position,
+                recent_action=encode_action(previous_action) if previous_action else 0,  # Default if no previous action
+                strategy=p.strategy,
+                bluffing_probability=p.bluffing_probability,
             )
             encoded_act = encode_action(action_str)
             self.game_data.append(
@@ -127,13 +152,54 @@ class TexasHoldemGame:
                     "state": encoded_state,
                     "action": encoded_act,
                     "player_id": p.player_id,
-                    "position": p.player_id,
-                    "recent_action": encoded_act,
+                    "position": p.position,
+                    "recent_action": encode_action(previous_action) if previous_action else 0,
                 }
             )
+            
+            if p.chips == 0 and (action_str == "call" or action_str == "raise"):
+                logging.info(f"Player {p.player_id} has gone all-in with a bet of {p.current_bet}.")
 
+            self.handle_side_pots()
+            
         # Return True if a raise occurred, else False
         return action_happened
+    
+    def handle_side_pots(self):
+        """
+        Handle side pots based on players' all-in statuses.
+        This method should be called after each betting round to adjust pots accordingly.
+        """
+        # Find all players who are all-in
+        all_in_players = [p for p in self.players if p.chips == 0 and p.in_hand]
+
+        if not all_in_players:
+            return  # No side pots needed
+
+        # Sort all-in players by their current bet
+        all_in_players_sorted = sorted(all_in_players, key=lambda p: p.current_bet)
+
+        for p in all_in_players_sorted:
+            # The amount to cover in the main pot
+            amount = p.current_bet
+
+            # Eligible players are those who have bet at least this amount
+            eligible_players = [player for player in self.players if player.current_bet >= amount]
+
+            # Create a side pot
+            side_pot = (amount * len(eligible_players), eligible_players.copy())
+
+            # Add to side pots
+            self.side_pots.append(side_pot)
+
+            # Reduce each eligible player's current bet
+            for player in eligible_players:
+                player.current_bet -= amount
+
+            # Reduce the main pot
+            self.current_pot -= side_pot[0]
+
+            logging.info(f"Created a side pot of {side_pot[0]} with players {[p.player_id for p in eligible_players]}.")
 
     def multi_betting_round(self, round_name="pre-flop"):
         """
@@ -227,34 +293,56 @@ class TexasHoldemGame:
         if not remaining_players:
             return  # Everyone folded earlier
 
-        best_rank = None
-        winners = []
+        # Evaluate all remaining players' hands
+        player_rankings = []
         for p in remaining_players:
             # Evaluate final 7 cards: p.hole_cards + self.community_cards
-            final_rank = evaluate_hand(self.community_cards, p.hole_cards)
-            # Lower rank value = better in Treys, so invert if needed
-            if best_rank is None or final_rank < best_rank:
-                best_rank = final_rank
-                winners = [p]
-            elif final_rank == best_rank:
-                winners.append(p)
+            final_rank = evaluate_hand(p.hole_cards, self.community_cards)
+            player_rankings.append((p, final_rank))
+            logging.info(f"Player {p.player_id} has a hand rank of {final_rank}.")
 
-        # If there's exactly one winner:
-        if len(winners) == 1:
-            winners[0].chips += self.current_pot
-            logging.info(
-                f"Player {winners[0].player_id} wins the pot of {self.current_pot}."
-            )
-        else:
-            # Split pot among winners
-            split_pot = self.current_pot // len(winners)
-            for w in winners:
-                w.chips += split_pot
-            logging.info(
-                f"Players {[w.player_id for w in winners]} split the pot of {self.current_pot}."
-            )
+        # Sort players by their hand rankings (assuming lower is better)
+        player_rankings.sort(key=lambda x: x[1])
 
+        # Determine winners for the main pot and side pots
+        pots = [("main pot", self.current_pot)] + [
+            (f"side pot {i+1}", pot[0]) for i, pot in enumerate(self.side_pots)
+        ]
+
+        for pot_name, pot_amount in pots:
+            if pot_amount == 0:
+                continue  # Skip empty pots
+
+            # Determine eligible players for this pot
+            if pot_name == "main pot":
+                eligible_players = remaining_players
+            else:
+                # Extract eligible players from side pot
+                index = int(pot_name.split()[2]) - 1
+                eligible_players = self.side_pots[index][1]
+
+            # Determine the best hand among eligible players
+            best_rank = None
+            winners = []
+            for p, rank in player_rankings:
+                if p in eligible_players:
+                    if best_rank is None or rank < best_rank:
+                        best_rank = rank
+                        winners = [p]
+                    elif rank == best_rank:
+                        winners.append(p)
+
+            # Split the pot among winners
+            if winners:
+                split_pot = pot_amount / len(winners)
+                for w in winners:
+                    w.chips += split_pot
+                winner_ids = [w.player_id for w in winners]
+                logging.info(f"{pot_name.capitalize()} of {pot_amount} won by Player(s) {winner_ids}.")
+
+        # Reset the main pot and side pots
         self.current_pot = 0
+        self.side_pots = []
 
     def reset_bets_for_next_round(self):
         """Reset each player's bet to 0 after a street ends."""
@@ -275,8 +363,11 @@ if __name__ == "__main__":
         level=logging.DEBUG if config.debug else logging.WARNING,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
-    game = TexasHoldemGame(num_players=6)
+    game = TexasHoldemGame(num_players=config.num_players)
     game.play_hand()
 
-    final_data = game.get_game_data()
+    final_data = game.get_game_data()    
     logging.info(f"Collected {len(final_data)} state-action records from the hand.")
+    
+    game.game_data = [] 
+    game.rotate_positions()
