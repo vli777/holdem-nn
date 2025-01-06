@@ -30,9 +30,15 @@ class PlayerDynamicsAttention(nn.Module):
         positions = positions.to(device)
 
         # Validate embedding indices
-        assert player_ids.max().item() < self.player_embeddings.num_embeddings, "Out-of-range player_ids"
-        assert actions.max().item() < self.action_embeddings.num_embeddings, "Out-of-range actions"
-        assert positions.max().item() < self.position_embeddings.num_embeddings, "Out-of-range positions"
+        assert (
+            player_ids.max().item() < self.player_embeddings.num_embeddings
+        ), "Out-of-range player_ids"
+        assert (
+            actions.max().item() < self.action_embeddings.num_embeddings
+        ), "Out-of-range actions"
+        assert (
+            positions.max().item() < self.position_embeddings.num_embeddings
+        ), "Out-of-range positions"
 
         # Embedding lookups
         player_embed = self.player_embeddings(player_ids).unsqueeze(1)

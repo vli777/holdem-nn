@@ -72,8 +72,8 @@ def encode_state(
     player_id,
     position,
     recent_action,
-    strategy,                
-    bluffing_probability    
+    strategy,
+    bluffing_probability,
 ):
     """
     Encode the state with embedded player-specific features.
@@ -86,14 +86,20 @@ def encode_state(
         player_id (int): Player identifier.
         position (int): Player position.
         recent_action (int): Recent action taken.
-        strategy (str): 0, 1, 2 encoding for aggression level,                
-        bluffing_probability (float): Bluffing probability.   
+        strategy (str): 0, 1, 2 encoding for aggression level,
+        bluffing_probability (float): Bluffing probability.
 
     Returns:
         list: Encoded state features.
     """
     base_features = hole_cards + community_cards + [normalized_strength, pot_odds]
-    encoded = base_features + [player_id, position, recent_action, strategy, bluffing_probability]
+    encoded = base_features + [
+        player_id,
+        position,
+        recent_action,
+        strategy,
+        bluffing_probability,
+    ]
     return encoded
 
 

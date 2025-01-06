@@ -3,7 +3,7 @@ import os
 import time
 from multiprocessing import Pool
 from config import config
-from training.hdf5 import save_game_sequences_to_hdf5
+from training.utils import save_game_sequences_to_hdf5
 from training.texas_holdem_game import TexasHoldemGame
 
 
@@ -11,11 +11,11 @@ def run_simulation(num_players: int, num_hands: int) -> list:
     """
     Simulate 'num_hands' hands of Texas Hold'em
     and return game-level sequences for each hand.
-    
+
     Args:
         num_players (int): Number of players in each game.
         num_hands (int): Number of hands to simulate.
-    
+
     Returns:
         list: List of game sequences, where each sequence is a list of dictionaries.
     """
@@ -74,11 +74,13 @@ if __name__ == "__main__":
     )
     start_time = time.time()
 
-    NUM_PLAYERS = 6
-    NUM_HANDS = 100000
+    NUM_PLAYERS = config.num_players
+    NUM_HANDS = config.num_hands
     DATA_PATH = config.data_path
-    
-    game_sequences = simulate_texas_holdem_parallel(num_players=NUM_PLAYERS, num_hands=NUM_HANDS)
+
+    game_sequences = simulate_texas_holdem_parallel(
+        num_players=NUM_PLAYERS, num_hands=NUM_HANDS
+    )
 
     save_game_sequences_to_hdf5(DATA_PATH, game_sequences)
 

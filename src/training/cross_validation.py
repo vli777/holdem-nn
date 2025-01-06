@@ -45,7 +45,9 @@ def k_fold_cross_validation(
     labels = [dataset[i][1].item() for i in range(len(dataset))]
     skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=42)
 
-    for fold, (train_indices, val_indices) in enumerate(skf.split(range(len(dataset)), labels)):
+    for fold, (train_indices, val_indices) in enumerate(
+        skf.split(range(len(dataset)), labels)
+    ):
         logging.info(f"Fold {fold + 1}/{k}")
 
         train_subset = Subset(dataset, train_indices)
@@ -97,7 +99,9 @@ def k_fold_cross_validation(
             if val_f1 > best_val_f1:
                 best_val_f1 = val_f1
                 patience_counter = 0
-                torch.save(model.state_dict(), f"{model_save_dir}/best_model_fold{fold + 1}.pt")
+                torch.save(
+                    model.state_dict(), f"{model_save_dir}/best_model_fold{fold + 1}.pt"
+                )
                 logging.info(f"Fold {fold + 1} - New best model saved.")
             else:
                 patience_counter += 1
@@ -177,7 +181,9 @@ def validate(loader, model, criterion, device):
             all_targets.extend(targets.cpu().numpy())
 
     avg_loss = total_loss / len(loader)
-    accuracy = sum([p == t for p, t in zip(all_preds, all_targets)]) / len(all_targets) * 100
+    accuracy = (
+        sum([p == t for p, t in zip(all_preds, all_targets)]) / len(all_targets) * 100
+    )
     f1 = f1_score(all_targets, all_preds, average="weighted")
 
     return avg_loss, accuracy, f1

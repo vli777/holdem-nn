@@ -1,15 +1,26 @@
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, roc_curve, auc, precision_recall_curve, average_precision_score
+from sklearn.metrics import (
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    f1_score,
+    roc_curve,
+    auc,
+    precision_recall_curve,
+    average_precision_score,
+)
 from sklearn.preprocessing import label_binarize
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from torch.utils.data import DataLoader 
+from torch.utils.data import DataLoader
 
 from config import config
 from PokerSequenceDataset import PokerSequenceDataset, poker_collate_fn
 from models.PokerTransformerModel import PokerTransformerModel
 
-def plot_confusion_matrix(true_labels, predicted_labels, classes=["fold", "call", "raise"]):
+
+def plot_confusion_matrix(
+    true_labels, predicted_labels, classes=["fold", "call", "raise"]
+):
     """
     Plot the confusion matrix.
 
@@ -23,12 +34,14 @@ def plot_confusion_matrix(true_labels, predicted_labels, classes=["fold", "call"
     """
     cm = confusion_matrix(true_labels, predicted_labels, labels=[0, 1, 2])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes)
-    disp.plot(cmap='Blues')
+    disp.plot(cmap="Blues")
     plt.title("Confusion Matrix")
     plt.show()
-    
 
-def plot_multiclass_roc(true_labels, predicted_probs, classes=["fold", "call", "raise"]):
+
+def plot_multiclass_roc(
+    true_labels, predicted_probs, classes=["fold", "call", "raise"]
+):
     """
     Plot ROC curves for each class in a multi-class setting.
 
@@ -43,21 +56,25 @@ def plot_multiclass_roc(true_labels, predicted_probs, classes=["fold", "call", "
     # Binarize the output
     y_true = label_binarize(true_labels, classes=[0, 1, 2])
     n_classes = y_true.shape[1]
-    
+
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
-    
+
     for i in range(n_classes):
         fpr[i], tpr[i], _ = roc_curve(y_true[:, i], predicted_probs[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
-    
+
     # Plot all ROC curves
     plt.figure(figsize=(10, 8))
     for i in range(n_classes):
-        plt.plot(fpr[i], tpr[i], label=f"ROC curve of class {classes[i]} (area = {roc_auc[i]:0.2f})")
-    
-    plt.plot([0, 1], [0, 1], 'k--')  # Diagonal
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            label=f"ROC curve of class {classes[i]} (area = {roc_auc[i]:0.2f})",
+        )
+
+    plt.plot([0, 1], [0, 1], "k--")  # Diagonal
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel("False Positive Rate")
@@ -66,7 +83,10 @@ def plot_multiclass_roc(true_labels, predicted_probs, classes=["fold", "call", "
     plt.legend(loc="lower right")
     plt.show()
 
-def plot_multiclass_precision_recall(true_labels, predicted_probs, classes=["fold", "call", "raise"]):
+
+def plot_multiclass_precision_recall(
+    true_labels, predicted_probs, classes=["fold", "call", "raise"]
+):
     """
     Plot Precision-Recall curves for each class in a multi-class setting.
 
@@ -81,20 +101,28 @@ def plot_multiclass_precision_recall(true_labels, predicted_probs, classes=["fol
     # Binarize the output
     y_true = label_binarize(true_labels, classes=[0, 1, 2])
     n_classes = y_true.shape[1]
-    
+
     precision = dict()
     recall = dict()
     average_precision = dict()
-    
+
     for i in range(n_classes):
-        precision[i], recall[i], _ = precision_recall_curve(y_true[:, i], predicted_probs[:, i])
-        average_precision[i] = average_precision_score(y_true[:, i], predicted_probs[:, i])
-    
+        precision[i], recall[i], _ = precision_recall_curve(
+            y_true[:, i], predicted_probs[:, i]
+        )
+        average_precision[i] = average_precision_score(
+            y_true[:, i], predicted_probs[:, i]
+        )
+
     # Plot all Precision-Recall curves
     plt.figure(figsize=(10, 8))
     for i in range(n_classes):
-        plt.plot(recall[i], precision[i], label=f"Precision-Recall curve of class {classes[i]} (AP = {average_precision[i]:0.2f})")
-    
+        plt.plot(
+            recall[i],
+            precision[i],
+            label=f"Precision-Recall curve of class {classes[i]} (AP = {average_precision[i]:0.2f})",
+        )
+
     plt.xlabel("Recall")
     plt.ylabel("Precision")
     plt.title("Precision-Recall Curves")
@@ -134,11 +162,11 @@ def load_trained_model(config, device):
 def evaluate_model(model, test_loader, device, config):
     """
     Evaluate the model and plot confusion matrix.
-    """    
+    """
     predicted_labels = []
     true_labels = []
     predicted_probs = []
-     
+
     with torch.no_grad():
         for batch in test_loader:
             states = batch["states"].to(device)
@@ -157,7 +185,7 @@ def evaluate_model(model, test_loader, device, config):
                 recent_actions,
                 strategies,
                 bluffing_probabilities,
-                mask=mask
+                mask=mask,
             )  # [batch_size, seq_len, output_dim]
 
             # Get predictions
@@ -166,7 +194,6 @@ def evaluate_model(model, test_loader, device, config):
             predicted = predicted.view(-1).cpu().numpy()
             actions = actions.view(-1).cpu().numpy()
             probs = probs.view(-1, config.output_dim).cpu().numpy()
-
 
             # Mask out padding
             valid_indices = actions != -1
@@ -188,17 +215,24 @@ def evaluate_model(model, test_loader, device, config):
     print(f"Test F1 Score: {f1:.4f}")
 
     # Plot confusion matrix
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["fold", "call", "raise"])
-    disp.plot(cmap='Blues')
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=cm, display_labels=["fold", "call", "raise"]
+    )
+    disp.plot(cmap="Blues")
     plt.title("Confusion Matrix on Test Set")
     plt.show()
+
 
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Replace this with your actual dataset
-    dataset = PokerSequenceDataset(hdf5_path=config.data_path, max_seq_len=config.max_seq_len)
-    test_dataset = torch.utils.data.Subset(dataset, indices=range(int(0.8 * len(dataset)), len(dataset)))
+    dataset = PokerSequenceDataset(
+        hdf5_path=config.data_path, max_seq_len=config.max_seq_len
+    )
+    test_dataset = torch.utils.data.Subset(
+        dataset, indices=range(int(0.8 * len(dataset)), len(dataset))
+    )
     test_loader = DataLoader(
         test_dataset,
         batch_size=config.batch_size,

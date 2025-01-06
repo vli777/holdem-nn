@@ -9,16 +9,17 @@ import pandas as pd
 
 DATA_PATH = config.data_path
 
+
 def plot_class_distribution(actions, title="Action Distribution"):
     plt.figure(figsize=(8, 5))
-    sns.countplot(x=actions, palette='viridis')
+    sns.countplot(x=actions, palette="viridis")
     plt.title(title)
     plt.xlabel("Action")
     plt.ylabel("Count")
     plt.show()
 
 
-def plot_correlation_heatmap(dataset, data_format='hdf5'):
+def plot_correlation_heatmap(dataset, data_format="hdf5"):
     """
     Plot a correlation heatmap for numerical features.
 
@@ -29,13 +30,13 @@ def plot_correlation_heatmap(dataset, data_format='hdf5'):
     Returns:
         None
     """
-    if data_format == 'hdf5':
+    if data_format == "hdf5":
         data_dict = {
             "sequence_length": [],
             "action": [],
             "player_id": [],
             "position": [],
-            "recent_action": []
+            "recent_action": [],
         }
         for key in dataset.game_keys:
             grp = dataset.hdf5_file[key]
@@ -51,19 +52,19 @@ def plot_correlation_heatmap(dataset, data_format='hdf5'):
             data_dict["player_id"].extend(player_ids)
             data_dict["position"].extend(positions)
             data_dict["recent_action"].extend(recent_actions)
-        
+
     else:
         print("Unsupported data format for correlation heatmap.")
         return
 
     df = pd.DataFrame(data_dict)
     plt.figure(figsize=(10, 8))
-    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+    sns.heatmap(df.corr(), annot=True, cmap="coolwarm")
     plt.title("Correlation Heatmap")
     plt.show()
 
 
-def plot_player_behavior(dataset, player_id, data_format='hdf5'):
+def plot_player_behavior(dataset, player_id, data_format="hdf5"):
     """
     Plot action distribution for a specific player.
 
@@ -76,14 +77,14 @@ def plot_player_behavior(dataset, player_id, data_format='hdf5'):
         None
     """
     actions = []
-    if data_format == 'hdf5':
+    if data_format == "hdf5":
         for key in dataset.game_keys:
             grp = dataset.hdf5_file[key]
             p_ids = grp["player_ids"][:]
             a_actions = grp["actions"][:]
             # Select actions where player_id matches
             actions.extend(a_actions[p_ids == player_id])
-    elif data_format == 'npz':
+    elif data_format == "npz":
         # Implement if needed
         pass
     else:
@@ -91,7 +92,7 @@ def plot_player_behavior(dataset, player_id, data_format='hdf5'):
         return
 
     plt.figure(figsize=(8, 5))
-    sns.countplot(x=actions, palette='viridis')
+    sns.countplot(x=actions, palette="viridis")
     plt.title(f"Action Distribution for Player {player_id}")
     plt.xlabel("Action")
     plt.ylabel("Count")
@@ -109,13 +110,10 @@ def plot_seq_len_vs_actions(sequence_lengths, actions):
     Returns:
         None
     """
-    df = pd.DataFrame({
-        "sequence_length": sequence_lengths,
-        "action": actions
-    })
+    df = pd.DataFrame({"sequence_length": sequence_lengths, "action": actions})
 
     plt.figure(figsize=(12, 6))
-    sns.boxplot(x="action", y="sequence_length", data=df, palette='coolwarm')
+    sns.boxplot(x="action", y="sequence_length", data=df, palette="coolwarm")
     plt.title("Sequence Length Distribution by Action")
     plt.xlabel("Action")
     plt.ylabel("Sequence Length")
@@ -133,7 +131,7 @@ def plot_time_series(sequence_lengths):
         None
     """
     plt.figure(figsize=(14, 7))
-    sns.lineplot(x=range(len(sequence_lengths)), y=sequence_lengths, color='blue')
+    sns.lineplot(x=range(len(sequence_lengths)), y=sequence_lengths, color="blue")
     plt.title("Sequence Length Over Dataset Index")
     plt.xlabel("Dataset Index")
     plt.ylabel("Sequence Length")
@@ -213,14 +211,17 @@ def inspect_hdf5_data(data_path, detailed=False):
         # Calculate padding percentage
         max_seq_len = max(sequence_lengths)
         dataset_size = len(hdf5_file.keys())
-        padding_percentage = (sum([max_seq_len - sl for sl in sequence_lengths]) / (max_seq_len * dataset_size)) * 100
+        padding_percentage = (
+            sum([max_seq_len - sl for sl in sequence_lengths])
+            / (max_seq_len * dataset_size)
+        ) * 100
         print(f"\nDataset Size: {dataset_size} games")
         print(f"Maximum Sequence Length: {max_seq_len}")
         print(f"Padding Percentage: {padding_percentage:.2f}%")
 
         # Plot Sequence Length Distribution
         plt.figure(figsize=(10, 6))
-        sns.histplot(sequence_lengths, bins=50, kde=True, color='skyblue')
+        sns.histplot(sequence_lengths, bins=50, kde=True, color="skyblue")
         plt.title("Distribution of Sequence Lengths")
         plt.xlabel("Sequence Length")
         plt.ylabel("Frequency")
@@ -228,7 +229,7 @@ def inspect_hdf5_data(data_path, detailed=False):
 
         # Plot Action Distribution
         plt.figure(figsize=(8, 5))
-        sns.countplot(x=actions, palette='viridis')
+        sns.countplot(x=actions, palette="viridis")
         plt.title("Distribution of Actions")
         plt.xlabel("Action")
         plt.ylabel("Count")
@@ -236,7 +237,7 @@ def inspect_hdf5_data(data_path, detailed=False):
 
         # Plot Player ID Distribution
         plt.figure(figsize=(8, 5))
-        sns.countplot(x=player_ids, palette='magma')
+        sns.countplot(x=player_ids, palette="magma")
         plt.title("Distribution of Player IDs")
         plt.xlabel("Player ID")
         plt.ylabel("Count")
@@ -244,7 +245,7 @@ def inspect_hdf5_data(data_path, detailed=False):
 
         # Plot Position Distribution
         plt.figure(figsize=(8, 5))
-        sns.countplot(x=positions, palette='coolwarm')
+        sns.countplot(x=positions, palette="coolwarm")
         plt.title("Distribution of Positions")
         plt.xlabel("Position")
         plt.ylabel("Count")
@@ -252,7 +253,7 @@ def inspect_hdf5_data(data_path, detailed=False):
 
         # Plot Recent Action Distribution
         plt.figure(figsize=(8, 5))
-        sns.countplot(x=recent_actions, palette='plasma')
+        sns.countplot(x=recent_actions, palette="plasma")
         plt.title("Distribution of Recent Actions")
         plt.xlabel("Recent Action")
         plt.ylabel("Count")
@@ -261,12 +262,20 @@ def inspect_hdf5_data(data_path, detailed=False):
         if detailed:
             print("\nDetailed Validation:")
             # Schema and Type Consistency Checks
-            required_datasets = {"states", "actions", "player_ids", "positions", "recent_actions"}
+            required_datasets = {
+                "states",
+                "actions",
+                "player_ids",
+                "positions",
+                "recent_actions",
+            }
             for group in hdf5_file.keys():
                 grp = hdf5_file[group]
                 grp_keys = set(grp.keys())
                 if not required_datasets.issubset(grp_keys):
-                    logging.warning(f"Group '{group}' is missing some required datasets.")
+                    logging.warning(
+                        f"Group '{group}' is missing some required datasets."
+                    )
                 else:
                     # Additional type checks can be implemented here
                     pass
