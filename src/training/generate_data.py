@@ -3,27 +3,32 @@ import os
 import time
 from multiprocessing import Pool
 from config import config
-from training.hdf5 import append_to_hdf5, initialize_hdf5
+from training.hdf5 import save_game_sequences_to_hdf5
 from training.texas_holdem_game import TexasHoldemGame
 
 
 def run_simulation(num_players: int, num_hands: int) -> list:
     """
     Simulate 'num_hands' hands of Texas Hold'em
-    and return the collected state-action pairs.
+    and return game-level sequences for each hand.
+    
+    Args:
+        num_players (int): Number of players in each game.
+        num_hands (int): Number of hands to simulate.
+    
+    Returns:
+        list: List of game sequences, where each sequence is a list of dictionaries.
     """
-    game_data = []
-
+    game_sequences = []
     game = TexasHoldemGame(num_players=num_players, starting_chips=1000)
 
-    # Play multiple hands
     for _ in range(num_hands):
         game.play_hand()
-        # Collect state-action pairs for the hand
-        game_data.extend(game.game_data)
+        # Append a deep copy to avoid reference issues
+        game_sequences.append(list(game.game_data))
         game.game_data = []  # Reset for the next hand
 
-    return game_data
+    return game_sequences
 
 
 def simulate_games_for_worker(args):
@@ -69,17 +74,13 @@ if __name__ == "__main__":
     )
     start_time = time.time()
 
-    # Simulate games
-    game_data = simulate_texas_holdem_parallel(num_players=6, num_games=100000)
+    NUM_PLAYERS = 6
+    NUM_HANDS = 100000
+    DATA_PATH = config.data_path
+    
+    game_sequences = simulate_texas_holdem_parallel(num_players=NUM_PLAYERS, num_hands=NUM_HANDS)
 
-    # Append or initialize HDF5 file
-    if not os.path.exists(config.data_path):
-        logging.info(
-            f"{config.data_path} does not exist. Initializing a new HDF5 file."
-        )
-        initialize_hdf5(config.data_path, state_dim=config.state_dim, initial_size=0)
-
-    append_to_hdf5(config.data_path, game_data, state_dim=config.state_dim)
+    save_game_sequences_to_hdf5(DATA_PATH, game_sequences)
 
     elapsed_time = time.time() - start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds")

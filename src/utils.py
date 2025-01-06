@@ -1,4 +1,3 @@
-import numpy as np
 import logging
 import random
 from treys import Evaluator, Card, Deck
@@ -65,24 +64,37 @@ def decide_action(
         return "fold"
 
 
-def encode_state(hole_cards, community_cards, normalized_hand_strength, pot_odds):
+def encode_state(
+    hole_cards,
+    community_cards,
+    normalized_strength,
+    pot_odds,
+    player_id,
+    position,
+    recent_action,
+    strategy,                
+    bluffing_probability    
+):
     """
-    Encodes the player's state as a feature vector, optimized for opponent modeling.
+    Encode the state with embedded player-specific features.
 
     Args:
-        hole_cards (list[int]): The player's hole cards (Treys integer format).
-        community_cards (list[int]): The shared community cards (Treys integer format).
-        normalized_hand_strength (float): Hand strength (normalized to [0, 1]).
-        pot_odds (float): The current pot odds (normalized to [0, 1]).
+        hole_cards (list): Player's hole cards.
+        community_cards (list): Community cards.
+        normalized_strength (float): Hand strength.
+        pot_odds (float): Pot odds.
+        player_id (int): Player identifier.
+        position (int): Player position.
+        recent_action (int): Recent action taken.
+        strategy (str): 0, 1, 2 encoding for aggression level,                
+        bluffing_probability (float): Bluffing probability.   
 
     Returns:
-        np.ndarray: A feature vector representing the player's state.
+        list: Encoded state features.
     """
-    # Combine cards and numerical features
-    cards_vector = np.array(hole_cards + community_cards, dtype=np.float32)
-    state = np.concatenate([cards_vector, [normalized_hand_strength, pot_odds]])
-
-    return state
+    base_features = hole_cards + community_cards + [normalized_strength, pot_odds]
+    encoded = base_features + [player_id, position, recent_action, strategy, bluffing_probability]
+    return encoded
 
 
 def encode_action(action):

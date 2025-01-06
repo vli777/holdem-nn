@@ -4,20 +4,22 @@ import logging
 
 
 class Settings(BaseSettings):
-    learning_rate: float = 1e-3
-    batch_size: int = 32
-    hidden_dim: int = 128
-    output_dim: int = 3
-    seq_len: int = 1
-    num_heads: int = 4
-    num_layers: int = 2
-    num_epochs: int = 10
-    early_stop_limit: int = 5
-    input_dim: int = 4
-    state_dim: int = 4
     model_path: Path = Path("saved_models/poker_model_full.pt")
     data_path: Path = Path("data/poker_dataset.h5")
-    debug: bool = False
+    learning_rate = 1e-4
+    batch_size = 64
+    hidden_dim = 256
+    output_dim = 3  # "fold", "call", "raise"
+    seq_len = 100  # Adjust based on EDA
+    num_heads = 8
+    num_layers = 4
+    num_players = 6
+    max_positions = 10
+    num_actions = 3
+    num_strategies = 3
+    num_epochs = 50
+    early_stop_limit = 5
+    dropout = 0.1
 
     class Config:
         env_file = ".env"
