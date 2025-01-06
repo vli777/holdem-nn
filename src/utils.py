@@ -86,18 +86,26 @@ def encode_state(
         player_id (int): Player identifier.
         position (int): Player position.
         recent_action (int): Recent action taken.
-        strategy (str): 0, 1, 2 encoding for aggression level,
-        bluffing_probability (float): Bluffing probability.
+        strategy (str): Strategy of the player.
 
     Returns:
         list: Encoded state features.
     """
     base_features = hole_cards + community_cards + [normalized_strength, pot_odds]
+    
+    # Convert strategy to numerical encoding
+    strategy_mapping = {
+        "tight-aggressive": 0,
+        "loose-passive": 1,
+        "balanced": 2
+    }
+    strategy_encoded = strategy_mapping.get(strategy, 2)  # Default to 'balanced' if unknown
+
     encoded = base_features + [
         player_id,
         position,
         recent_action,
-        strategy,
+        strategy_encoded,
         bluffing_probability,
     ]
     return encoded
