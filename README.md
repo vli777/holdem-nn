@@ -11,17 +11,5 @@ This project uses generated data instead of actual game play data for training. 
 100 - 200k: practical use
 500k - 1m: production optimal
 
-For the model, I utilized the Linformer model [ arXiv:2006.04768v3](https://arxiv.org/abs/2006.04768) for the transformer model and encoded several features for the card states of multiple players and their actions. There are still many features that can be considered i.e. game context, player tendencies, temporal dynamics including players dropping out later in the game, opponent modeling.
-
-Ideally after training the baseline model with transformers, if this approach can approximate SOTA performance, we can update the model with reinforcement learning to cover the remainder of the explorer space with faster convergence.* 
-
-Instructions
-
-1. Install requirements
-2. Generate or place game data .npy files in data/ (see generate_data.py encoding methods to view format)
-3. Run train.py
-4. Test out a sample hand by running main.py
-
-![image](https://github.com/user-attachments/assets/e7fc55c8-6c9e-422f-90f0-e4d06badd9a9)
-
+Features being included: Game context, player tendencies, temporal dynamics, opponent modeling, etc.
 
