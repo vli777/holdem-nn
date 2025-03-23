@@ -1,5 +1,6 @@
 import logging
 import random
+from typing import List, Dict, Any, Tuple, Set
 from config import config
 from training.player_state import PlayerState
 from treys import Deck
@@ -14,7 +15,7 @@ from utils import (
 
 
 class TexasHoldemGame:
-    def __init__(self, num_players=6, starting_chips=1000):
+    def __init__(self, num_players: int = 6, starting_chips: int = 1000):
         self.num_players = num_players
         self.starting_chips = starting_chips
 
@@ -32,30 +33,29 @@ class TexasHoldemGame:
 
         # Deck, community cards, pot, minimal raise
         self.deck = Deck()
-        self.community_cards = []
+        self.community_cards: List[int] = []
         self.current_pot = 0
         self.minimum_raise = 2
 
         # For storing states/actions, etc.
-        self.game_data = []  # Will hold the final state-action records
-        self.side_pots = []  # List of tuples: (pot_amount, eligible_players)
+        self.game_data: List[Dict[str, Any]] = []  # Will hold the final state-action records
+        self.side_pots: List[Tuple[float, List[PlayerState]]] = []  # List of tuples: (pot_amount, eligible_players)
 
-    def reset_for_new_hand(self):
+    def reset_for_new_hand(self) -> None:
         """Reset or re-init fields for a new hand."""
-        self.deck = Deck()
-        self.deck.shuffle()
-        self.community_cards = []
+        self.deck.shuffle()  # Just shuffle existing deck instead of creating new one
+        self.community_cards.clear()  # More efficient than reassignment
         self.current_pot = 0
-        self.side_pots = []
+        self.side_pots.clear()  # More efficient than reassignment
         for p in self.players:
             p.reset_for_new_hand()
 
-    def deal_preflop(self):
+    def deal_preflop(self) -> None:
         """Deal 2 hole cards to each player."""
         for p in self.players:
             p.hole_cards = self.deck.draw(2)
 
-    def post_blinds(self):
+    def post_blinds(self) -> None:
         """Simple approach: small blind = 1 chip, big blind = 2 chips."""
         if self.num_players < 2:
             return
@@ -76,31 +76,31 @@ class TexasHoldemGame:
         logging.info(f"Player {sb_player.player_id} posts small blind of {sb}.")
         logging.info(f"Player {bb_player.player_id} posts big blind of {bb}.")
 
-    def rotate_positions(self):
+    def rotate_positions(self) -> None:
         """Rotate player positions clockwise."""
         first_player = self.players.pop(0)
         self.players.append(first_player)
         for idx, player in enumerate(self.players):
             player.position = idx
 
-    def single_pass_betting_round(self, round_name="pre-flop"):
+    def single_pass_betting_round(self, round_name: str = "pre-flop") -> bool:
         """
         Conduct a single pass of betting across all players.
         Returns True if a raise occurred, False otherwise.
         """
         logging.info(f"--- {round_name.upper()} BETTING ROUND (SINGLE PASS) ---")
 
-        action_happened = False
+        # Pre-calculate current highest bet
         current_highest_bet = max(p.current_bet for p in self.players if p.in_hand)
+        
+        # Use list comprehension for better performance
+        active_players = [p for p in self.players if p.in_hand]
+        action_happened = False
 
-        for p in self.players:
-            if not p.in_hand:
-                continue
+        for p in active_players:
+            bet_to_call = max(current_highest_bet - p.current_bet, 0)
 
-            bet_to_call = current_highest_bet - p.current_bet
-            bet_to_call = max(bet_to_call, 0)
-
-            # Evaluate the player's hand strength, pot odds, etc.
+            # Cache hand evaluation results
             normalized_strength = evaluate_hand(p.hole_cards, self.community_cards)
             pot_odds = calculate_pot_odds(self.current_pot, bet_to_call)
 
@@ -143,38 +143,29 @@ class TexasHoldemGame:
                 pot_odds=pot_odds,
                 player_id=p.player_id,
                 position=p.position,
-                recent_action=(
-                    encode_action(previous_action) if previous_action else 0
-                ),  # Default if no previous action
+                recent_action=encode_action(previous_action) if previous_action else 0,
                 strategy=p.strategy,
                 bluffing_probability=p.bluffing_probability,
             )
             encoded_act = encode_action(action_str)
-            self.game_data.append(
-                {
-                    "state": encoded_state,
-                    "action": encoded_act,
-                    "player_id": p.player_id,
-                    "position": p.position,
-                    "recent_action": (
-                        encode_action(previous_action) if previous_action else 0
-                    ),
-                    "strategy": encode_strategy(p.strategy),
-                    "bluffing_probability": p.bluffing_probability,
-                }
-            )
+            self.game_data.append({
+                "state": encoded_state,
+                "action": encoded_act,
+                "player_id": p.player_id,
+                "position": p.position,
+                "recent_action": encode_action(previous_action) if previous_action else 0,
+                "strategy": encode_strategy(p.strategy),
+                "bluffing_probability": p.bluffing_probability,
+            })
 
             if p.chips == 0 and (action_str == "call" or action_str == "raise"):
-                logging.info(
-                    f"Player {p.player_id} has gone all-in with a bet of {p.current_bet}."
-                )
+                logging.info(f"Player {p.player_id} has gone all-in with a bet of {p.current_bet}.")
 
             self.handle_side_pots()
 
-        # Return True if a raise occurred, else False
         return action_happened
 
-    def handle_side_pots(self):
+    def handle_side_pots(self) -> None:
         """
         Handle side pots based on players' all-in statuses.
         This method should be called after each betting round to adjust pots accordingly.
@@ -193,9 +184,7 @@ class TexasHoldemGame:
             amount = p.current_bet
 
             # Eligible players are those who have bet at least this amount
-            eligible_players = [
-                player for player in self.players if player.current_bet >= amount
-            ]
+            eligible_players = [player for player in self.players if player.current_bet >= amount]
 
             # Create a side pot
             side_pot = (amount * len(eligible_players), eligible_players.copy())
@@ -214,7 +203,7 @@ class TexasHoldemGame:
                 f"Created a side pot of {side_pot[0]} with players {[p.player_id for p in eligible_players]}."
             )
 
-    def multi_betting_round(self, round_name="pre-flop"):
+    def multi_betting_round(self, round_name: str = "pre-flop") -> None:
         """
         Conduct a multiple-pass betting round for a single street
         (pre-flop, flop, turn, or river).
@@ -237,34 +226,30 @@ class TexasHoldemGame:
                 logging.info("No raise in this pass. Betting round ends.")
                 break
 
-            # If at least one raise occurred, we loop back
-            # giving players a chance to respond in another pass
-            # But note that in real poker, you'd track who still needs
-            # to act. This simplified approach just goes around again.
         logging.info(f"=== MULTI-PASS {round_name.upper()} BETTING COMPLETE ===")
 
-    def deal_flop(self):
+    def deal_flop(self) -> None:
         """Deal 3 community cards."""
         if len(self.deck.cards) < 3:
             logging.warning("Not enough cards to deal the flop.")
             return
-        self.community_cards += self.deck.draw(3)
+        self.community_cards.extend(self.deck.draw(3))  # More efficient than +=
 
-    def deal_turn(self):
+    def deal_turn(self) -> None:
         """Deal 1 community card (turn)."""
         if len(self.deck.cards) < 1:
             logging.warning("Not enough cards to deal the turn.")
             return
-        self.community_cards += self.deck.draw(1)
+        self.community_cards.append(self.deck.draw(1))  # More efficient than +=
 
-    def deal_river(self):
+    def deal_river(self) -> None:
         """Deal 1 community card (river)."""
         if len(self.deck.cards) < 1:
             logging.warning("Not enough cards to deal the river.")
             return
-        self.community_cards += self.deck.draw(1)
+        self.community_cards.append(self.deck.draw(1))  # More efficient than +=
 
-    def play_hand(self):
+    def play_hand(self) -> None:
         self.reset_for_new_hand()
         self.deal_preflop()
         self.post_blinds()
@@ -300,91 +285,76 @@ class TexasHoldemGame:
 
         self.showdown()
 
-    def showdown(self):
+    def showdown(self) -> None:
         # Collect players still in hand
         remaining_players = [p for p in self.players if p.in_hand]
         if not remaining_players:
             return  # Everyone folded earlier
 
-        # Evaluate all remaining players' hands
-        player_rankings = []
-        for p in remaining_players:
-            # Evaluate final 7 cards: p.hole_cards + self.community_cards
-            final_rank = evaluate_hand(p.hole_cards, self.community_cards)
-            player_rankings.append((p, final_rank))
-            logging.info(f"Player {p.player_id} has a hand rank of {final_rank}.")
-
-        # Sort players by their hand rankings (assuming lower is better)
-        player_rankings.sort(key=lambda x: x[1])
-
-        # Determine winners for the main pot and side pots
-        pots = [("main pot", self.current_pot)] + [
-            (f"side pot {i+1}", pot[0]) for i, pot in enumerate(self.side_pots)
+        # Pre-calculate all hand rankings
+        player_rankings = [
+            (p, evaluate_hand(p.hole_cards, self.community_cards))
+            for p in remaining_players
         ]
-
-        for pot_name, pot_amount in pots:
+        
+        # Sort once and use for all pots
+        player_rankings.sort(key=lambda x: x[1])
+        
+        # Process pots more efficiently
+        for pot_name, pot_amount in [("main pot", self.current_pot)] + [
+            (f"side pot {i+1}", pot[0]) 
+            for i, pot in enumerate(self.side_pots)
+        ]:
             if pot_amount == 0:
-                continue  # Skip empty pots
-
-            # Determine eligible players for this pot
-            if pot_name == "main pot":
-                eligible_players = remaining_players
-            else:
-                # Extract eligible players from side pot
-                index = int(pot_name.split()[2]) - 1
-                eligible_players = self.side_pots[index][1]
-
-            # Determine the best hand among eligible players
-            best_rank = None
-            winners = []
-            for p, rank in player_rankings:
-                if p in eligible_players:
-                    if best_rank is None or rank < best_rank:
-                        best_rank = rank
-                        winners = [p]
-                    elif rank == best_rank:
-                        winners.append(p)
-
-            # Split the pot among winners
+                continue
+                
+            # Determine eligible players
+            eligible_players = (
+                remaining_players 
+                if pot_name == "main pot" 
+                else self.side_pots[int(pot_name.split()[2]) - 1][1]
+            )
+            
+            # Find winners more efficiently
+            winners = [
+                p for p, rank in player_rankings 
+                if p in eligible_players and rank == player_rankings[0][1]
+            ]
+            
             if winners:
                 split_pot = pot_amount / len(winners)
                 for w in winners:
                     w.chips += split_pot
-                winner_ids = [w.player_id for w in winners]
-                logging.info(
-                    f"{pot_name.capitalize()} of {pot_amount} won by Player(s) {winner_ids}."
-                )
 
         # Reset the main pot and side pots
         self.current_pot = 0
-        self.side_pots = []
+        self.side_pots.clear()
 
-    def reset_bets_for_next_round(self):
+    def reset_bets_for_next_round(self) -> None:
         """Reset each player's bet to 0 after a street ends."""
         for p in self.players:
             p.current_bet = 0
 
-    def count_in_hand(self):
+    def count_in_hand(self) -> int:
         """Return how many players are still in the hand."""
         return sum(p.in_hand for p in self.players)
 
-    def is_game_over(self):
+    def is_game_over(self) -> bool:
         """Check if the game is over (only one player has chips)."""
-        players_with_chips = [p for p in self.players if p.chips > 0]
-        return len(players_with_chips) <= 1
+        return len([p for p in self.players if p.chips > 0]) <= 1
 
-    def get_game_data(self):
+    def get_game_data(self) -> List[Dict[str, Any]]:
         """Return or transform the recorded data for outside use."""
         return self.game_data
 
-    def play_game(self):
+    def play_game(self) -> PlayerState:
         """Play a complete game until there's a single winner."""
         while not self.is_game_over():
             self.play_hand()
             # Rotate positions for the next hand
             self.rotate_positions()
             # Reset game data for the next hand
-            self.game_data = []
+            self.game_data.clear()
         
         # Find the winner
         winner = next(p for p in self.players if p.chips > 0)

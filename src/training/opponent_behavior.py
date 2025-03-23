@@ -1,12 +1,25 @@
 import random
+from typing import Literal
 
+StrategyType = Literal["tight-aggressive", "loose-passive", "balanced"]
 
 class OpponentBehavior:
-    def __init__(self, strategy="balanced", bluffing_probability=0.2):
+    __slots__ = ['strategy', 'bluffing_probability']
+
+    def __init__(
+        self,
+        strategy: StrategyType = "balanced",
+        bluffing_probability: float = 0.2
+    ):
         self.strategy = strategy
         self.bluffing_probability = bluffing_probability
 
-    def decide_action(self, hand_strength, pot_odds, position):
+    def decide_action(
+        self,
+        hand_strength: float,
+        pot_odds: float,
+        position: int
+    ) -> Literal["fold", "call", "raise"]:
         """
         Decide the action based on hand strength, pot odds, and player position.
 
@@ -18,104 +31,57 @@ class OpponentBehavior:
         Returns:
             str: The decided action ("fold", "call", or "raise").
         """
-        is_bluffing = False
-        if hand_strength < 0.4 and random.random() < self.bluffing_probability:
-            is_bluffing = True
+        is_bluffing = hand_strength < 0.4 and random.random() < self.bluffing_probability
 
-        # 2) Position-based logic
+        # Early position (0-1)
         if position < 2:
-            # --- EARLY POSITION: Tighter play ---
             if self.strategy == "tight-aggressive":
-                # A typical tight-aggressive in early position might only raise with > 0.7 strength
-                # or occasionally bluff.
                 if is_bluffing:
                     return "raise"
-                elif hand_strength > 0.7 and hand_strength > pot_odds:
-                    return "raise"
-                else:
-                    return "fold"
+                return "raise" if hand_strength > 0.7 and hand_strength > pot_odds else "fold"
 
             elif self.strategy == "loose-passive":
-                # A looser, more passive player might call more often if they have at least moderate strength
-                # or occasionally bluff.
                 if is_bluffing and hand_strength < 0.3:
                     return "raise"
-                elif hand_strength > 0.3:
-                    return "call"
-                else:
-                    return "fold"
+                return "call" if hand_strength > 0.3 else "fold"
 
-            else:  # "balanced"
-                # Balanced in early position: mostly fold unless they have decent odds,
-                # but might occasionally bluff.
+            else:  # balanced
                 if is_bluffing and hand_strength < 0.6:
                     return "raise"
-                elif hand_strength > pot_odds:
-                    return "call"
-                else:
-                    return "fold"
+                return "call" if hand_strength > pot_odds else "fold"
 
+        # Middle position (2-4)
         elif position <= 4:
-            # --- MIDDLE POSITION: Moderate play ---
             if self.strategy == "tight-aggressive":
-                # Slightly looser than early, but still not crazy.
                 if is_bluffing:
                     return "raise"
-                elif hand_strength > 0.6 and hand_strength > pot_odds:
-                    return "raise"
-                else:
-                    return "fold"
+                return "raise" if hand_strength > 0.6 and hand_strength > pot_odds else "fold"
 
             elif self.strategy == "loose-passive":
-                # Might call quite frequently if strength is at least moderate,
-                # and can occasionally bluff with weaker hands.
                 if is_bluffing and hand_strength < 0.4:
-                    # For variety, you could do "raise" half the time or "call" half the time, etc.
                     return "raise"
-                elif hand_strength > 0.2:
-                    return "call"
-                else:
-                    return "fold"
+                return "call" if hand_strength > 0.2 else "fold"
 
-            else:  # "balanced"
-                # Balanced in middle might raise with stronger hands,
-                # call if moderate, fold if weak, and occasionally bluff.
+            else:  # balanced
                 if is_bluffing and hand_strength < 0.5:
                     return "raise"
-                elif hand_strength > pot_odds:
+                if hand_strength > pot_odds:
                     return "raise"
-                elif hand_strength > 0.4:
-                    return "call"
-                else:
-                    return "fold"
+                return "call" if hand_strength > 0.4 else "fold"
 
+        # Late position (>4)
         else:
-            # --- LATE POSITION (> 4): Looser play ---
             if self.strategy == "tight-aggressive":
-                # Even a tight-aggressive player in late position can open up more.
                 if is_bluffing:
                     return "raise"
-                elif hand_strength > pot_odds:
-                    return "raise"
-                else:
-                    return "call"
+                return "raise" if hand_strength > pot_odds else "call"
 
             elif self.strategy == "loose-passive":
-                # A loose-passive late position player calls a lot, occasionally folds if super weak,
-                # might bluff sometimes.
                 if is_bluffing:
                     return "raise"
-                elif hand_strength > 0.1:
-                    return "call"
-                else:
-                    return "fold"
+                return "call" if hand_strength > 0.1 else "fold"
 
-            else:  # "balanced"
-                # Balanced in late position: more likely to raise or call,
-                # plus the occasional bluff.
+            else:  # balanced
                 if is_bluffing:
                     return "raise"
-                elif hand_strength > 0.5:
-                    return "raise"
-                else:
-                    return "call"
+                return "raise" if hand_strength > 0.5 else "call"
