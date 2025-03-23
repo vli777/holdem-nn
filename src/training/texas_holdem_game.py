@@ -9,6 +9,7 @@ from utils import (
     encode_action,
     encode_state,
     evaluate_hand,
+    encode_strategy,
 )
 
 
@@ -158,6 +159,8 @@ class TexasHoldemGame:
                     "recent_action": (
                         encode_action(previous_action) if previous_action else 0
                     ),
+                    "strategy": encode_strategy(p.strategy),
+                    "bluffing_probability": p.bluffing_probability,
                 }
             )
 
@@ -365,9 +368,28 @@ class TexasHoldemGame:
         """Return how many players are still in the hand."""
         return sum(p.in_hand for p in self.players)
 
+    def is_game_over(self):
+        """Check if the game is over (only one player has chips)."""
+        players_with_chips = [p for p in self.players if p.chips > 0]
+        return len(players_with_chips) <= 1
+
     def get_game_data(self):
         """Return or transform the recorded data for outside use."""
         return self.game_data
+
+    def play_game(self):
+        """Play a complete game until there's a single winner."""
+        while not self.is_game_over():
+            self.play_hand()
+            # Rotate positions for the next hand
+            self.rotate_positions()
+            # Reset game data for the next hand
+            self.game_data = []
+        
+        # Find the winner
+        winner = next(p for p in self.players if p.chips > 0)
+        logging.info(f"Game Over! Winner is Player {winner.player_id} with {winner.chips} chips.")
+        return winner
 
 
 if __name__ == "__main__":
@@ -376,10 +398,5 @@ if __name__ == "__main__":
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
     game = TexasHoldemGame(num_players=config.num_players)
-    game.play_hand()
-
-    final_data = game.get_game_data()
-    logging.info(f"Collected {len(final_data)} state-action records from the hand.")
-
-    game.game_data = []
-    game.rotate_positions()
+    winner = game.play_game()
+    logging.info(f"Game completed with winner: Player {winner.player_id}")

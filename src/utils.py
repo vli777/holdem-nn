@@ -214,3 +214,21 @@ def randomize_sample_action():
         "hand_strength": hand_strength,
         "pot_odds": pot_odds,
     }
+
+
+def encode_strategy(strategy: str) -> int:
+    """
+    Encode player strategy into a numeric value.
+    
+    Args:
+        strategy (str): Player strategy ("tight-aggressive", "loose-passive", "balanced")
+        
+    Returns:
+        int: Encoded strategy (0: tight-aggressive, 1: loose-passive, 2: balanced)
+    """
+    strategy_map = {
+        "tight-aggressive": 0,
+        "loose-passive": 1,
+        "balanced": 2
+    }
+    return strategy_map.get(strategy, 2)  # Default to balanced if unknown strategy

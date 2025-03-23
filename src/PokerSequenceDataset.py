@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import Dataset
 import h5py
 import numpy as np
-import torch
 from config import config
 
 DATA_PATH = config.data_path
@@ -48,27 +47,34 @@ class PokerSequenceDataset(Dataset):
             idx (int): Index of the game sequence.
 
         Returns:
-            dict: Dictionary containing padded sequences and masks.
+            dict: Dictionary containing padded sequences, masks, and game metadata.
         """
         key = self.game_keys[idx]
-        states = self.hdf5_file[key]["states"][:]
-        actions = self.hdf5_file[key]["actions"][:]
-        player_ids = self.hdf5_file[key]["player_ids"][:]
-        positions = self.hdf5_file[key]["positions"][:]
-        recent_actions = self.hdf5_file[key]["recent_actions"][:]
-        strategies = self.hdf5_file[key]["strategies"][:]
-        bluffing_probabilities = self.hdf5_file[key]["bluffing_probs"][:]
+        game_group = self.hdf5_file[key]
+        
+        # Get game metadata
+        winner_id = game_group.attrs['winner_id']
+        final_chips = game_group.attrs['final_chips']
+        
+        # Get sequence data
+        states = game_group["states"][:]
+        actions = game_group["actions"][:]
+        player_ids = game_group["player_ids"][:]
+        positions = game_group["positions"][:]
+        recent_actions = game_group["recent_actions"][:]
+        strategies = game_group["strategies"][:]
+        bluffing_probs = game_group["bluffing_probs"][:]
 
         seq_len = len(states)
         if seq_len > self.max_seq_len:
             # Truncate sequences longer than max_seq_len
-            states = states[-self.max_seq_len :]
-            actions = actions[-self.max_seq_len :]
-            player_ids = player_ids[-self.max_seq_len :]
-            positions = positions[-self.max_seq_len :]
-            recent_actions = recent_actions[-self.max_seq_len :]
-            strategies = strategies[-self.max_seq_len :]
-            bluffing_probabilities = bluffing_probabilities[-self.max_seq_len :]
+            states = states[-self.max_seq_len:]
+            actions = actions[-self.max_seq_len:]
+            player_ids = player_ids[-self.max_seq_len:]
+            positions = positions[-self.max_seq_len:]
+            recent_actions = recent_actions[-self.max_seq_len:]
+            strategies = strategies[-self.max_seq_len:]
+            bluffing_probs = bluffing_probs[-self.max_seq_len:]
             mask = np.ones(self.max_seq_len, dtype=bool)
         else:
             pad_length = self.max_seq_len - seq_len
@@ -91,11 +97,8 @@ class PokerSequenceDataset(Dataset):
                 strategies = np.pad(
                     strategies, (pad_length, 0), "constant", constant_values=-1
                 )
-                bluffing_probabilities = np.pad(
-                    bluffing_probabilities,
-                    (pad_length, 0),
-                    "constant",
-                    constant_values=-1,
+                bluffing_probs = np.pad(
+                    bluffing_probs, (pad_length, 0), "constant", constant_values=-1
                 )
                 mask = np.concatenate(
                     (np.zeros(pad_length, dtype=bool), np.ones(seq_len, dtype=bool))
@@ -112,10 +115,12 @@ class PokerSequenceDataset(Dataset):
                 recent_actions, dtype=torch.long
             ),  # [seq_len]
             "strategies": torch.tensor(strategies, dtype=torch.long),  # [seq_len]
-            "bluffing_probabilities": torch.tensor(
-                bluffing_probabilities, dtype=torch.float32
+            "bluffing_probs": torch.tensor(
+                bluffing_probs, dtype=torch.float32
             ),  # [seq_len]
             "mask": torch.tensor(mask, dtype=torch.bool),  # [seq_len]
+            "winner_id": torch.tensor(winner_id, dtype=torch.long),  # scalar
+            "final_chips": torch.tensor(final_chips, dtype=torch.float32),  # scalar
         }
 
 
@@ -145,10 +150,12 @@ def poker_collate_fn(batch):
     strategies = torch.stack(
         [item["strategies"] for item in batch]
     )  # [batch_size, seq_len]
-    bluffing_probabilities = torch.stack(
-        [item["bluffing_probabilities"] for item in batch]
+    bluffing_probs = torch.stack(
+        [item["bluffing_probs"] for item in batch]
     )  # [batch_size, seq_len]
     masks = torch.stack([item["mask"] for item in batch])  # [batch_size, seq_len]
+    winner_ids = torch.stack([item["winner_id"] for item in batch])  # [batch_size]
+    final_chips = torch.stack([item["final_chips"] for item in batch])  # [batch_size]
 
     return {
         "states": states,  # [batch_size, seq_len, input_dim]
@@ -157,6 +164,8 @@ def poker_collate_fn(batch):
         "positions": positions,  # [batch_size, seq_len]
         "recent_actions": recent_actions,  # [batch_size, seq_len]
         "strategies": strategies,  # [batch_size, seq_len]
-        "bluffing_probabilities": bluffing_probabilities,  # [batch_size, seq_len]
+        "bluffing_probs": bluffing_probs,  # [batch_size, seq_len]
         "mask": masks,  # [batch_size, seq_len]
+        "winner_ids": winner_ids,  # [batch_size]
+        "final_chips": final_chips,  # [batch_size]
     }

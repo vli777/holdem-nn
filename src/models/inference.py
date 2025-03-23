@@ -24,6 +24,8 @@ def predict_action(model, game_history, current_round, device, max_seq_len=100):
     player_ids = [entry["player_id"] for entry in game_history]
     positions = [entry["position"] for entry in game_history]
     recent_actions = [entry["recent_action"] for entry in game_history]
+    strategies = [entry.get("strategy", 2) for entry in game_history]  # Default to balanced strategy
+    bluffing_probs = [entry.get("bluffing_probability", 0.0) for entry in game_history]
 
     # Pad or truncate the sequence
     seq_len = len(states)
@@ -33,36 +35,28 @@ def predict_action(model, game_history, current_round, device, max_seq_len=100):
         player_ids = player_ids[-max_seq_len:]
         positions = positions[-max_seq_len:]
         recent_actions = recent_actions[-max_seq_len:]
+        strategies = strategies[-max_seq_len:]
+        bluffing_probs = bluffing_probs[-max_seq_len:]
         seq_len = max_seq_len
     else:
         pad_length = max_seq_len - seq_len
-        states = np.pad(
-            states, ((pad_length, 0), (0, 0)), "constant", constant_values=0
-        )
+        states = np.pad(states, ((pad_length, 0), (0, 0)), "constant", constant_values=0)
         actions = np.pad(actions, (pad_length, 0), "constant", constant_values=-1)
         player_ids = np.pad(player_ids, (pad_length, 0), "constant", constant_values=-1)
         positions = np.pad(positions, (pad_length, 0), "constant", constant_values=-1)
-        recent_actions = np.pad(
-            recent_actions, (pad_length, 0), "constant", constant_values=-1
-        )
+        recent_actions = np.pad(recent_actions, (pad_length, 0), "constant", constant_values=-1)
+        strategies = np.pad(strategies, (pad_length, 0), "constant", constant_values=2)
+        bluffing_probs = np.pad(bluffing_probs, (pad_length, 0), "constant", constant_values=0.0)
         seq_len = max_seq_len
 
     # Convert to tensors
-    states = (
-        torch.tensor(states, dtype=torch.float32).unsqueeze(0).to(device)
-    )  # [1, max_seq_len, input_dim]
-    actions = (
-        torch.tensor(actions, dtype=torch.long).unsqueeze(0).to(device)
-    )  # [1, max_seq_len]
-    player_ids = (
-        torch.tensor(player_ids, dtype=torch.long).unsqueeze(0).to(device)
-    )  # [1, max_seq_len]
-    positions = (
-        torch.tensor(positions, dtype=torch.long).unsqueeze(0).to(device)
-    )  # [1, max_seq_len]
-    recent_actions = (
-        torch.tensor(recent_actions, dtype=torch.long).unsqueeze(0).to(device)
-    )  # [1, max_seq_len]
+    states = torch.tensor(states, dtype=torch.float32).unsqueeze(0).to(device)  # [1, max_seq_len, input_dim]
+    actions = torch.tensor(actions, dtype=torch.long).unsqueeze(0).to(device)  # [1, max_seq_len]
+    player_ids = torch.tensor(player_ids, dtype=torch.long).unsqueeze(0).to(device)  # [1, max_seq_len]
+    positions = torch.tensor(positions, dtype=torch.long).unsqueeze(0).to(device)  # [1, max_seq_len]
+    recent_actions = torch.tensor(recent_actions, dtype=torch.long).unsqueeze(0).to(device)  # [1, max_seq_len]
+    strategies = torch.tensor(strategies, dtype=torch.long).unsqueeze(0).to(device)  # [1, max_seq_len]
+    bluffing_probs = torch.tensor(bluffing_probs, dtype=torch.float32).unsqueeze(0).to(device)  # [1, max_seq_len]
 
     # Create mask
     mask = torch.ones((1, max_seq_len), dtype=torch.bool).to(device)
@@ -70,7 +64,15 @@ def predict_action(model, game_history, current_round, device, max_seq_len=100):
         mask[:, : max_seq_len - len(game_history)] = False  # Padded steps
 
     with torch.no_grad():
-        policy_logits = model(states, mask=mask)  # [1, max_seq_len, output_dim]
+        policy_logits = model(
+            x=states,
+            player_ids=player_ids,
+            positions=positions,
+            recent_actions=recent_actions,
+            strategies=strategies,
+            bluffing_probabilities=bluffing_probs,
+            mask=mask
+        )  # [1, max_seq_len, output_dim]
 
     current_round = seq_len  # Assuming 0-based indexing; adjust if necessary
     if current_round >= max_seq_len:

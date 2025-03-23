@@ -3,6 +3,7 @@ import h5py
 import logging
 import numpy as np
 import uuid
+from typing import List, Dict, Any
 
 
 def initialize_hdf5(
@@ -42,42 +43,93 @@ def initialize_hdf5(
         raise
 
 
-def save_to_hdf5(hdf5_path, game_sequences):
+def save_to_hdf5(file_path: str, game_sequences: List[Dict[str, Any]]):
     """
-    Save game-level sequences to the HDF5 file in a structured manner.
+    Save game sequences to an HDF5 file.
 
     Args:
-        hdf5_path (str): Path to the HDF5 file.
-        game_sequences (list): List of game sequences, where each game sequence is a list of dictionaries.
+        file_path (str): Path to save the HDF5 file.
+        game_sequences (List[Dict]): List of game sequences, each containing:
+            - game_id: int
+            - winner_id: int
+            - final_chips: float
+            - sequence: List[Dict] containing state-action records
     """
-    os.makedirs(os.path.dirname(hdf5_path), exist_ok=True)
-    with h5py.File(hdf5_path, "a") as hdf5_file:
-        for idx, game_sequence in enumerate(game_sequences):
-            unique_id = uuid.uuid4()
-            group_name = f"game_{unique_id}_{idx}"
-            group = hdf5_file.create_group(group_name)
+    with h5py.File(file_path, 'w') as f:
+        for game in game_sequences:
+            game_group = f.create_group(f"game_{game['game_id']}")
+            
+            # Save game metadata
+            game_group.attrs['winner_id'] = game['winner_id']
+            game_group.attrs['final_chips'] = game['final_chips']
+            
+            # Extract sequence data
+            sequence = game['sequence']
+            states = np.array([record['state'] for record in sequence])
+            actions = np.array([record['action'] for record in sequence])
+            player_ids = np.array([record['player_id'] for record in sequence])
+            positions = np.array([record['position'] for record in sequence])
+            recent_actions = np.array([record['recent_action'] for record in sequence])
+            strategies = np.array([record['strategy'] for record in sequence])
+            bluffing_probs = np.array([record['bluffing_probability'] for record in sequence])
+            
+            # Save sequence data
+            game_group.create_dataset('states', data=states)
+            game_group.create_dataset('actions', data=actions)
+            game_group.create_dataset('player_ids', data=player_ids)
+            game_group.create_dataset('positions', data=positions)
+            game_group.create_dataset('recent_actions', data=recent_actions)
+            game_group.create_dataset('strategies', data=strategies)
+            game_group.create_dataset('bluffing_probs', data=bluffing_probs)
+            
+        logging.info(f"Saved {len(game_sequences)} complete game sequences to {file_path}")
 
-            # Extract fields
-            states = [entry["state"] for entry in game_sequence]
-            actions = [entry["action"] for entry in game_sequence]
-            player_ids = [entry["player_id"] for entry in game_sequence]
-            positions = [entry["position"] for entry in game_sequence]
-            recent_actions = [entry["recent_action"] for entry in game_sequence]
 
-            # Convert to numpy arrays
-            states = np.array(states, dtype=np.float32)
-            actions = np.array(actions, dtype=np.int64)
-            player_ids = np.array(player_ids, dtype=np.int64)
-            positions = np.array(positions, dtype=np.int64)
-            recent_actions = np.array(recent_actions, dtype=np.int64)
+def load_from_hdf5(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Load game sequences from an HDF5 file.
 
-            # Create datasets
-            group.create_dataset("states", data=states, compression="gzip")
-            group.create_dataset("actions", data=actions, compression="gzip")
-            group.create_dataset("player_ids", data=player_ids, compression="gzip")
-            group.create_dataset("positions", data=positions, compression="gzip")
-            group.create_dataset(
-                "recent_actions", data=recent_actions, compression="gzip"
-            )
+    Args:
+        file_path (str): Path to the HDF5 file.
 
-    logging.info(f"Saved {len(game_sequences)} game sequences to {hdf5_path}.")
+    Returns:
+        List[Dict]: List of game sequences with the same structure as save_to_hdf5 input.
+    """
+    game_sequences = []
+    
+    with h5py.File(file_path, 'r') as f:
+        for game_key in f.keys():
+            game_group = f[game_key]
+            
+            # Load game metadata
+            game_data = {
+                'game_id': int(game_key.split('_')[1]),
+                'winner_id': game_group.attrs['winner_id'],
+                'final_chips': game_group.attrs['final_chips'],
+                'sequence': []
+            }
+            
+            # Load sequence data
+            states = game_group['states'][:]
+            actions = game_group['actions'][:]
+            player_ids = game_group['player_ids'][:]
+            positions = game_group['positions'][:]
+            recent_actions = game_group['recent_actions'][:]
+            strategies = game_group['strategies'][:]
+            bluffing_probs = game_group['bluffing_probs'][:]
+            
+            # Reconstruct sequence
+            for i in range(len(states)):
+                game_data['sequence'].append({
+                    'state': states[i],
+                    'action': actions[i],
+                    'player_id': player_ids[i],
+                    'position': positions[i],
+                    'recent_action': recent_actions[i],
+                    'strategy': strategies[i],
+                    'bluffing_probability': bluffing_probs[i]
+                })
+            
+            game_sequences.append(game_data)
+    
+    return game_sequences
