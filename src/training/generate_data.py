@@ -3,27 +3,37 @@ import os
 import time
 from multiprocessing import Pool
 from config import config
-from training.hdf5 import append_to_hdf5, initialize_hdf5
+from training.hdf5 import save_to_hdf5
 from training.texas_holdem_game import TexasHoldemGame
 
 
-def run_simulation(num_players: int, num_hands: int) -> list:
+def run_simulation(num_players: int, num_games: int) -> list:
     """
-    Simulate 'num_hands' hands of Texas Hold'em
-    and return the collected state-action pairs.
+    Simulate 'num_games' complete Texas Hold'em games
+    and return game-level sequences for each game.
+
+    Args:
+        num_players (int): Number of players in each game.
+        num_games (int): Number of complete games to simulate.
+
+    Returns:
+        list: List of game sequences, where each sequence is a list of dictionaries.
     """
-    game_data = []
+    game_sequences = []
+    
+    for game_idx in range(num_games):
+        game = TexasHoldemGame(num_players=num_players, starting_chips=1000)
+        winner = game.play_game()
+        # Append the complete game sequence
+        game_sequences.append({
+            'game_id': game_idx,
+            'winner_id': winner.player_id,
+            'final_chips': winner.chips,
+            'sequence': list(game.game_data)
+        })
+        logging.info(f"Completed game {game_idx + 1}/{num_games}")
 
-    game = TexasHoldemGame(num_players=num_players, starting_chips=1000)
-
-    # Play multiple hands
-    for _ in range(num_hands):
-        game.play_hand()
-        # Collect state-action pairs for the hand
-        game_data.extend(game.game_data)
-        game.game_data = []  # Reset for the next hand
-
-    return game_data
+    return game_sequences
 
 
 def simulate_games_for_worker(args):
@@ -32,16 +42,16 @@ def simulate_games_for_worker(args):
     Args:
         args (tuple): (num_players, games_per_worker, worker_id)
     Returns:
-        list: The combined game data from all hands this worker played.
+        list: The combined game data from all games this worker played.
     """
-    num_players, num_hands, worker_id = args
-    results = run_simulation(num_players=num_players, num_hands=num_hands)
+    num_players, num_games, worker_id = args
+    results = run_simulation(num_players=num_players, num_games=num_games)
     return results
 
 
 def simulate_texas_holdem_parallel(num_players: int = 6, num_games: int = 1000) -> list:
     """
-    Parallel simulation of Texas Hold'em games
+    Parallel simulation of complete Texas Hold'em games
     """
     num_workers = os.cpu_count()
     base_games_per_worker = num_games // num_workers
@@ -69,17 +79,15 @@ if __name__ == "__main__":
     )
     start_time = time.time()
 
-    # Simulate games
-    game_data = simulate_texas_holdem_parallel(num_players=6, num_games=100000)
+    NUM_PLAYERS = config.num_players
+    NUM_GAMES = config.num_hands  # We'll keep using num_hands in config but it now represents complete games
+    DATA_PATH = config.data_path
 
-    # Append or initialize HDF5 file
-    if not os.path.exists(config.data_path):
-        logging.info(
-            f"{config.data_path} does not exist. Initializing a new HDF5 file."
-        )
-        initialize_hdf5(config.data_path, state_dim=config.state_dim, initial_size=0)
+    game_sequences = simulate_texas_holdem_parallel(
+        num_players=NUM_PLAYERS, num_games=NUM_GAMES
+    )
 
-    append_to_hdf5(config.data_path, game_data, state_dim=config.state_dim)
+    save_to_hdf5(DATA_PATH, game_sequences)
 
     elapsed_time = time.time() - start_time
     logging.info(f"Total execution time: {elapsed_time:.2f} seconds")
